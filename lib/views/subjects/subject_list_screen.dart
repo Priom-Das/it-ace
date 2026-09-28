@@ -10,7 +10,7 @@ import '../previous_questions/previous_year_questions_screen.dart';
 import 'lecture_list_screen.dart';
 import 'sub_folder_list_screen.dart';
 
-// English Comment: Main Folder Screen with AppBar rounded search box UI.
+// English Comment: Main Folder Screen with enhanced search UI displaying video & PDF action buttons.
 class SubjectListScreen extends StatefulWidget {
   const SubjectListScreen({super.key});
 
@@ -136,7 +136,6 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         actions: [
-          // English Comment: Embedded Rounded Search Box inside AppBar action area.
           Container(
             width: 180,
             height: 38,
@@ -182,7 +181,7 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
     );
   }
 
-  // English Comment: Renders active search result view or loading state.
+  // English Comment: Renders active search result view with direct media action buttons.
   Widget _buildSearchResultsUI() {
     if (_isLoadingSearch) {
       return const Center(child: CircularProgressIndicator());
@@ -204,134 +203,176 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
         final item = _searchResults[index];
         final String type = item['result_type'];
 
-        IconData iconData = Icons.folder;
-        if (type == 'lecture') iconData = Icons.play_circle_fill;
-        if (type == 'question') iconData = Icons.picture_as_pdf;
+        // Folder & Sub-Folder UI
+        if (type == 'folder' || type == 'sub_folder') {
+          return Card(
+            elevation: 0,
+            color: const Color(0xFFF3EEFC),
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6B4EE6),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.folder, color: Colors.white, size: 18),
+              ),
+              title: Text(
+                item['title'] ?? '',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              subtitle: Text(
+                item['subtitle'] ?? '',
+                style: const TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              onTap: () {
+                if (type == 'sub_folder') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LectureListScreen(
+                        subjectName: item['sub_folder'],
+                        subTopic: item['sub_folder'],
+                      ),
+                    ),
+                  );
+                } else {
+                  final String parentFolder = item['parent_folder'];
+                  if (parentFolder == 'PREVIOUS YEAR QUESTIONS') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PreviousYearQuestionsScreen(),
+                      ),
+                    );
+                  } else {
+                    final List<String> subfolders = List<String>.from(item['sub_folders'] ?? []);
+                    if (subfolders.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SubFolderListScreen(
+                            parentFolder: parentFolder,
+                            subFolders: subfolders,
+                          ),
+                        ),
+                      );
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LectureListScreen(
+                            subjectName: parentFolder,
+                            subTopic: null,
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+            ),
+          );
+        }
+
+        // Lecture Material UI with Video and PDF Action Buttons
+        final String? youtubeVideoId = item['youtube_video_id'];
+        final String? pdfUrl = item['pdf_url'];
 
         return Card(
           elevation: 0,
           color: const Color(0xFFF3EEFC),
           margin: const EdgeInsets.symmetric(vertical: 6),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF6B4EE6),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(iconData, color: Colors.white, size: 18),
-            ),
-            title: Text(
-              item['title'] ?? '',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-            ),
-            subtitle: Text(
-              item['subtitle'] ?? '',
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            onTap: () {
-              // 1. If clicked on a Sub Folder (e.g. C Programming)
-              if (type == 'sub_folder') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => LectureListScreen(
-                      subjectName: item['sub_folder'],
-                      subTopic: item['sub_folder'],
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['title'] ?? 'Untitled Material',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
-                );
-              }
-              // 2. If clicked on a Main Folder
-              else if (type == 'folder') {
-                final String parentFolder = item['parent_folder'];
-                if (parentFolder == 'PREVIOUS YEAR QUESTIONS') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const PreviousYearQuestionsScreen(),
-                    ),
-                  );
-                } else {
-                  final List<String> subfolders = List<String>.from(item['sub_folders'] ?? []);
-                  if (subfolders.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SubFolderListScreen(
-                          parentFolder: parentFolder,
-                          subFolders: subfolders,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item['subtitle'] ?? '',
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (youtubeVideoId != null && youtubeVideoId.isNotEmpty)
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => VideoPlayerScreen(
+                                title: item['title'] ?? 'Lecture Video',
+                                youtubeVideoId: youtubeVideoId,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.play_circle_fill, size: 18),
+                        label: const Text('Watch Video'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6B4EE6),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
-                      ),
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LectureListScreen(
-                          subjectName: parentFolder,
-                          subTopic: null,
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    if (pdfUrl != null && pdfUrl.isNotEmpty)
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          if (kIsWeb) {
+                            _openPdfDirectly(pdfUrl);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PdfViewerScreen(
+                                  title: item['title'] ?? 'PDF Document',
+                                  pdfUrl: pdfUrl,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.picture_as_pdf, size: 18, color: Colors.grey),
+                        label: const Text(
+                          'PDF',
+                          style: TextStyle(color: Colors.grey),
                         ),
-                      ),
-                    );
-                  }
-                }
-              }
-              // 3. Direct Lecture click (Video/PDF)
-              else if (type == 'lecture') {
-                final String? youtubeVideoId = item['youtube_video_id'];
-                final String? pdfUrl = item['pdf_url'];
-
-                if (youtubeVideoId != null && youtubeVideoId.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => VideoPlayerScreen(
-                        title: item['title'],
-                        youtubeVideoId: youtubeVideoId,
-                      ),
-                    ),
-                  );
-                } else if (pdfUrl != null && pdfUrl.isNotEmpty) {
-                  if (kIsWeb) {
-                    _openPdfDirectly(pdfUrl);
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PdfViewerScreen(
-                          title: item['title'],
-                          pdfUrl: pdfUrl,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.grey),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
-                      ),
-                    );
-                  }
-                }
-              }
-              // 4. Direct Question click (PDF)
-              else if (type == 'question') {
-                final String? pdfUrl = item['pdf_url'];
-                if (pdfUrl != null && pdfUrl.isNotEmpty) {
-                  if (kIsWeb) {
-                    _openPdfDirectly(pdfUrl);
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PdfViewerScreen(
-                          title: item['title'],
-                          pdfUrl: pdfUrl,
-                        ),
-                      ),
-                    );
-                  }
-                }
-              }
-            },
+                      )
+                    else
+                      const SizedBox.shrink(),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
