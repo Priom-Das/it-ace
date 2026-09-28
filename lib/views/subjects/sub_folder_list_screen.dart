@@ -116,13 +116,6 @@ class _SubFolderListScreenState extends State<SubFolderListScreen> {
                   );
                 }),
                 if (_directLectures.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
-                    child: Text(
-                      'Direct Files & Lectures',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
                   ..._directLectures.map((lecture) {
                     final String? youtubeVideoId = lecture['youtube_video_id'];
                     final String? pdfUrl = lecture['pdf_url'];

@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// English Comment: Dedicated Upload Screen for previous year questions.
+// English Comment: Dedicated Upload Screen for previous year questions with fixed storage path and schema matching.
 class PreviousQuestionUploadScreen extends StatefulWidget {
   const PreviousQuestionUploadScreen({super.key});
 
@@ -52,7 +52,9 @@ class _PreviousQuestionUploadScreenState extends State<PreviousQuestionUploadScr
     try {
       final fileBytes = _pickedFile!.files.first.bytes;
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_pickedFile!.files.first.name}';
-      final String storagePath = 'PREVIOUS_YEAR_QUESTIONS/$_selectedSubCategory/$fileName';
+      
+      // Fixed: Folder path matches exact bucket folder structure 'Previous Year Questions'
+      final String storagePath = 'Previous Year Questions/$_selectedSubCategory/$fileName';
 
       if (kIsWeb) {
         await _supabase.storage.from('materials').uploadBinary(storagePath, fileBytes!);
@@ -67,11 +69,15 @@ class _PreviousQuestionUploadScreenState extends State<PreviousQuestionUploadScr
 
       final String filePublicUrl = _supabase.storage.from('materials').getPublicUrl(storagePath);
 
+      // Safe integer extraction for exam_year (e.g. extracts '2022' from '2022-2023')
+      final String yearInput = _examYearController.text.trim();
+      final int? parsedYear = int.tryParse(RegExp(r'\d{4}').stringMatch(yearInput) ?? '');
+
       await _supabase.from('previous_questions').insert({
         'title': _titleController.text.trim(),
         'category': _selectedSubCategory,
         'exam_name': _examNameController.text.trim(),
-        'exam_year': int.tryParse(_examYearController.text.trim()),
+        'exam_year': parsedYear,
         'job_category': _jobCategoryController.text.trim(),
         'file_url': filePublicUrl,
       });
@@ -141,7 +147,7 @@ class _PreviousQuestionUploadScreenState extends State<PreviousQuestionUploadScr
               controller: _examYearController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Exam Year (Optional)',
+                labelText: 'Exam Year (e.g. 2023)',
                 border: OutlineInputBorder(),
               ),
             ),
