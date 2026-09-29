@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
-// English Comment: Screen for playing YouTube videos in-app with controlled height.
+// English Comment: Screen for playing YouTube videos in-app with centered layout alignment.
 class VideoPlayerScreen extends StatefulWidget {
   final String title;
   final String youtubeVideoId;
@@ -62,35 +62,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
-          child: Column(
-            children: [
-              Container(
-                constraints: BoxConstraints(
-                  maxHeight: screenHeight * 0.7,
-                ),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: YoutubePlayer(
-                    controller: _controller,
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Center(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxHeight: screenHeight * 0.7,
+                      maxWidth: 900,
+                    ),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: YoutubePlayer(
+                        controller: _controller,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _openInYouTubeApp,
-                icon: const Icon(Icons.open_in_new),
-                label: const Text('Open / Save in YouTube'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6B4EE6),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _openInYouTubeApp,
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Open / Save in YouTube'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6B4EE6),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
