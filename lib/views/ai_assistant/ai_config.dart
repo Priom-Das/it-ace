@@ -1,14 +1,21 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-// English Comment: Configuration file loading multiple API keys securely from environment variables with strict prompt rules.
+// English Comment: Secure configuration file loading API keys dynamically from environment variables with safe fallback.
 class AiConfig {
-  // English Comment: Retrieve all API keys as a list from environment variables
   static List<String> get apiKeys {
-    final String keysString = dotenv.env['GEMINI_API_KEYS'] ?? '';
-    if (keysString.isEmpty) return [];
+    String keysString = '';
+    try {
+      keysString = dotenv.env['GEMINI_API_KEYS'] ?? '';
+    } catch (_) {
+      keysString = '';
+    }
+    
+    if (keysString.isEmpty) {
+      // English Comment: Return empty list or placeholders to prevent public leakage while maintaining build stability
+      return [];
+    }
     return keysString.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
   }
-
   static const String systemPrompt = '''
 You are an expert Educational, Academic, Research & Job Preparation AI Assistant. Your primary role is to help users with:
 1. All Academic Studies: From Nursery, School, College, University levels, to advanced Thesis, PhD, and Research work across any subject.
