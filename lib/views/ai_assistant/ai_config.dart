@@ -1,10 +1,13 @@
-// English Comment: Configuration file with updated strict prompt rules to prevent LaTeX formatting on non-mathematical Bengali and grammar text.
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+// English Comment: Configuration file loading multiple API keys securely from environment variables with strict prompt rules.
 class AiConfig {
-  static const List<String> apiKeys = [
-    'AIzaSyBRZMs4cHFbtbX39_Zz3zP6UHW1OpaxnkQ',
-    'AIzaSyArnOZyhK_y9VDfbQSb8dDwwvhu_aTt3ZQ',
-    'AIzaSyAmjIxPmSz1affvc0lco8KnjjdemoWcofc',
-  ];
+  // English Comment: Retrieve all API keys as a list from environment variables
+  static List<String> get apiKeys {
+    final String keysString = dotenv.env['GEMINI_API_KEYS'] ?? '';
+    if (keysString.isEmpty) return [];
+    return keysString.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
 
   static const String systemPrompt = '''
 You are an expert Educational, Academic, Research & Job Preparation AI Assistant. Your primary role is to help users with:

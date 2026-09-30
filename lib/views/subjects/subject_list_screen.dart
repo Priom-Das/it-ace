@@ -1,7 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/folder_structure.dart';
 import '../media_viewers/pdf_viewer_screen.dart';
@@ -108,15 +106,17 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
     }
   }
 
-  Future<void> _openPdfDirectly(String pdfUrl) async {
-    final Uri url = Uri.parse(pdfUrl);
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open PDF URL')),
-        );
-      }
-    }
+  // English Comment: Open PDF inside the app via PdfViewerScreen for both Web and Mobile.
+  void _openPdfDirectly(String pdfUrl, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PdfViewerScreen(
+          title: title,
+          pdfUrl: pdfUrl,
+        ),
+      ),
+    );
   }
 
   @override
@@ -341,19 +341,8 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
                     if (pdfUrl != null && pdfUrl.isNotEmpty)
                       OutlinedButton.icon(
                         onPressed: () {
-                          if (kIsWeb) {
-                            _openPdfDirectly(pdfUrl);
-                          } else {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PdfViewerScreen(
-                                  title: item['title'] ?? 'PDF Document',
-                                  pdfUrl: pdfUrl,
-                                ),
-                              ),
-                            );
-                          }
+                          // English Comment: Direct to PdfViewerScreen uniformly across platforms without opening external tabs
+                          _openPdfDirectly(pdfUrl, item['title'] ?? 'PDF Document');
                         },
                         icon: const Icon(Icons.picture_as_pdf, size: 18, color: Colors.grey),
                         label: const Text(

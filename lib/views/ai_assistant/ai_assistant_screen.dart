@@ -15,7 +15,9 @@ import 'ai_config.dart';
 import 'chat_session.dart';
 
 class AiAssistantScreen extends StatefulWidget {
-  const AiAssistantScreen({super.key});
+  final bool isEmbedded;
+
+  const AiAssistantScreen({super.key, this.isEmbedded = false});
 
   @override
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -460,7 +462,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget build(BuildContext context) {
     final currentSession = _sessions.isNotEmpty ? _sessions[_currentSessionIndex] : null;
 
-    return Scaffold(
+    final Widget mainContent = Scaffold(
       appBar: AppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
@@ -480,6 +482,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ],
         ),
         centerTitle: true,
+        automaticallyImplyLeading: !widget.isEmbedded,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -488,7 +491,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
         ],
       ),
-      drawer: Drawer(
+      drawer: widget.isEmbedded ? null : Drawer(
         child: Column(
           children: [
             DrawerHeader(
@@ -770,5 +773,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         ],
       ),
     );
+
+    return mainContent;
   }
 }

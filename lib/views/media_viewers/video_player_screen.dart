@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import '../ai_assistant/ai_assistant_screen.dart';
+import '../ai_assistant/draggable_ai_fab.dart';
 
-// English Comment: Screen for playing YouTube videos in-app with centered layout alignment.
+// English Comment: Screen for playing YouTube videos in-app with centered layout alignment and modern Draggable AI FAB.
 class VideoPlayerScreen extends StatefulWidget {
   final String title;
   final String youtubeVideoId;
@@ -46,6 +48,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  void _openAiAssistantSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, controller) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: const AiAssistantScreen(isEmbedded: true),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double screenHeight = MediaQuery.of(context).size.height;
@@ -62,44 +84,53 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ),
         ],
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Center(
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxHeight: screenHeight * 0.7,
-                      maxWidth: 900,
-                    ),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: YoutubePlayer(
-                        controller: _controller,
+      body: Stack(
+        children: [
+          Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Center(
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxHeight: screenHeight * 0.7,
+                          maxWidth: 900,
+                        ),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: YoutubePlayer(
+                            controller: _controller,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _openInYouTubeApp,
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('Open / Save in YouTube'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6B4EE6),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: _openInYouTubeApp,
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Open / Save in YouTube'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6B4EE6),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
           ),
-        ),
+
+          // Messenger Chat Head Style Draggable AI Floating Button
+          DraggableAiFab(
+            onPressed: () => _openAiAssistantSheet(context),
+          ),
+        ],
       ),
     );
   }
