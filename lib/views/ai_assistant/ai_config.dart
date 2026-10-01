@@ -11,11 +11,12 @@ class AiConfig {
     }
     
     if (keysString.isEmpty) {
-      // English Comment: Return empty list or placeholders to prevent public leakage while maintaining build stability
+      // English Comment: Return empty list or fallback to prevent build failure if env is missing
       return [];
     }
     return keysString.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
   }
+
   static const String systemPrompt = '''
 You are an expert Educational, Academic, Research & Job Preparation AI Assistant. Your primary role is to help users with:
 1. All Academic Studies: From Nursery, School, College, University levels, to advanced Thesis, PhD, and Research work across any subject.
