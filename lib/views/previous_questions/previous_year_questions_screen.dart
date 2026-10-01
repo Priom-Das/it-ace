@@ -1,11 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../media_viewers/pdf_viewer_screen.dart';
 import 'previous_question_upload_screen.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../ai_assistant/draggable_ai_fab.dart';
 
-// English Comment: Screen dedicated ONLY for Previous Year Questions with modern Draggable AI FAB and fixed Upload Button.
+// English Comment: Screen dedicated ONLY for Previous Year Questions with modern Draggable AI FAB and fixed Upload Button and offline caching.
 class PreviousYearQuestionsScreen extends StatefulWidget {
   const PreviousYearQuestionsScreen({super.key});
 
@@ -17,11 +19,44 @@ class _PreviousYearQuestionsScreenState extends State<PreviousYearQuestionsScree
   final SupabaseClient _supabase = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _questions = [];
+  static const String _cacheKey = 'cached_previous_questions';
 
   @override
   void initState() {
     super.initState();
-    _fetchPreviousQuestions();
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    // English Comment: Load cached data first for instant offline availability
+    await _loadFromCache();
+    // English Comment: Then try fetching fresh data from server
+    await _fetchPreviousQuestions();
+  }
+
+  Future<void> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? cachedData = prefs.getString(_cacheKey);
+      if (cachedData != null) {
+        final List<dynamic> decodedList = jsonDecode(cachedData);
+        setState(() {
+          _questions = List<Map<String, dynamic>>.from(decodedList);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // Ignore cache read errors
+    }
+  }
+
+  Future<void> _saveToCache(List<Map<String, dynamic>> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonEncode(data));
+    } catch (e) {
+      // Ignore cache write errors
+    }
   }
 
   Future<void> _fetchPreviousQuestions() async {
@@ -31,15 +66,20 @@ class _PreviousYearQuestionsScreenState extends State<PreviousYearQuestionsScree
           .select()
           .order('id', ascending: false);
 
+      final fetchedList = List<Map<String, dynamic>>.from(response as List);
+      
       setState(() {
-        _questions = List<Map<String, dynamic>>.from(response as List);
+        _questions = fetchedList;
         _isLoading = false;
       });
+
+      // English Comment: Save latest fetched data to local cache
+      await _saveToCache(fetchedList);
     } catch (e) {
       setState(() => _isLoading = false);
-      if (mounted) {
+      if (_questions.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading questions: $e')),
+          SnackBar(content: Text('Offline mode: Unable to sync latest questions. ($e)')),
         );
       }
     }

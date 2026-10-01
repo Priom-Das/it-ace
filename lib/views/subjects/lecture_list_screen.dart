@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../media_viewers/pdf_viewer_screen.dart';
 import '../media_viewers/video_player_screen.dart';
@@ -31,26 +33,53 @@ class _LectureListScreenState extends State<LectureListScreen> {
     _fetchLectures();
   }
 
+  // English Comment: Fetches lectures from Supabase with robust local SharedPreferences fallback for offline support.
   Future<void> _fetchLectures() async {
+    final cacheKey = 'cached_lectures_${widget.subjectName}_${widget.subTopic ?? 'general'}';
+    
+    // English Comment: First, try to load from local cache immediately so offline user sees data instantly.
     try {
-      final response = await _supabase
+      final prefs = await SharedPreferences.getInstance();
+      final cachedDataStr = prefs.getString(cacheKey);
+      if (cachedDataStr != null) {
+        final List decoded = jsonDecode(cachedDataStr);
+        if (mounted) {
+          setState(() {
+            _lectures = List<Map<String, dynamic>>.from(decoded);
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (cacheError) {
+      debugPrint('Initial cache read error: $cacheError');
+    }
+
+    // English Comment: Then attempt to fetch fresh data from Supabase if online.
+    try {
+      var query = _supabase
           .from('lecture_materials')
           .select()
-          .ilike('subject', widget.subjectName)
-          .order('id', ascending: true);
+          .ilike('subject', widget.subjectName);
 
-      setState(() {
-        _lectures = List<Map<String, dynamic>>.from(response as List);
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      final response = await query.order('id', ascending: true);
+      final fetchedList = List<Map<String, dynamic>>.from(response as List);
+
+      // Save updated list to local cache
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(cacheKey, jsonEncode(fetchedList));
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading content: $e')),
-        );
+        setState(() {
+          _lectures = fetchedList;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Network fetch failed or offline mode active: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }

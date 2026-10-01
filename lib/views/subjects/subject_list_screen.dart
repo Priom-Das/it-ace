@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/folder_structure.dart';
@@ -24,7 +26,30 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
   
   List<Map<String, dynamic>> _searchResults = [];
 
-  // English Comment: Executes global search across static folder structure and database tables.
+  @override
+  void initState() {
+    super.initState();
+    _preloadAndCacheData();
+  }
+
+  // English Comment: Preloads and caches lectures and questions locally for offline search support.
+  Future<void> _preloadAndCacheData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Fetch lectures and questions from Supabase if online
+      final lecturesResponse = await _supabase.from('lecture_materials').select();
+      final questionsResponse = await _supabase.from('previous_questions').select();
+
+      // Save to local storage as JSON strings
+      await prefs.setString('cached_lectures', jsonEncode(lecturesResponse));
+      await prefs.setString('cached_questions', jsonEncode(questionsResponse));
+    } catch (e) {
+      debugPrint('Offline cache preload error (using existing cache if available): $e');
+    }
+  }
+
+  // English Comment: Executes global search across static folder structure and database tables with offline fallback.
   Future<void> _performSearch(String query) async {
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) {
@@ -65,13 +90,48 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
         }
       });
 
-      // 2. Search in lecture_materials Table
-      final lecturesResponse = await _supabase
-          .from('lecture_materials')
-          .select()
-          .ilike('title', '%$cleanQuery%');
+      List lecturesList = [];
+      List questionsList = [];
 
-      for (var item in (lecturesResponse as List)) {
+      try {
+        // Try fetching fresh data from Supabase
+        final lecturesResponse = await _supabase
+            .from('lecture_materials')
+            .select()
+            .ilike('title', '%$cleanQuery%');
+        lecturesList = lecturesResponse as List;
+
+        final questionsResponse = await _supabase
+            .from('previous_questions')
+            .select()
+            .ilike('title', '%$cleanQuery%');
+        questionsList = questionsResponse as List;
+      } catch (networkError) {
+        // Fallback to local cache when offline
+        debugPrint('Network search failed, fetching from local cache: $networkError');
+        final prefs = await SharedPreferences.getInstance();
+        
+        final cachedLecturesStr = prefs.getString('cached_lectures');
+        if (cachedLecturesStr != null) {
+          final List decodedLectures = jsonDecode(cachedLecturesStr);
+          lecturesList = decodedLectures.where((item) {
+            final title = (item['title'] ?? '').toString().toLowerCase();
+            return title.contains(cleanQuery);
+          }).toList();
+        }
+
+        final cachedQuestionsStr = prefs.getString('cached_questions');
+        if (cachedQuestionsStr != null) {
+          final List decodedQuestions = jsonDecode(cachedQuestionsStr);
+          questionsList = decodedQuestions.where((item) {
+            final title = (item['title'] ?? '').toString().toLowerCase();
+            return title.contains(cleanQuery);
+          }).toList();
+        }
+      }
+
+      // 2. Add Lectures to Results
+      for (var item in lecturesList) {
         results.add({
           'result_type': 'lecture',
           'title': item['title'] ?? 'Untitled Lecture',
@@ -81,13 +141,8 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
         });
       }
 
-      // 3. Search in previous_questions Table
-      final questionsResponse = await _supabase
-          .from('previous_questions')
-          .select()
-          .ilike('title', '%$cleanQuery%');
-
-      for (var item in (questionsResponse as List)) {
+      // 3. Add Questions to Results
+      for (var item in questionsList) {
         results.add({
           'result_type': 'question',
           'title': item['title'] ?? 'Untitled Question',

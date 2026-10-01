@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../media_viewers/pdf_viewer_screen.dart';
 import '../media_viewers/video_player_screen.dart';
@@ -32,7 +34,9 @@ class _SubFolderListScreenState extends State<SubFolderListScreen> {
     _fetchDirectLectures();
   }
 
+  // English Comment: Fetches direct lectures from Supabase with local SharedPreferences fallback for offline support.
   Future<void> _fetchDirectLectures() async {
+    final cacheKey = 'cached_direct_lectures_${widget.parentFolder}';
     try {
       final response = await _supabase
           .from('lecture_materials')
@@ -40,14 +44,40 @@ class _SubFolderListScreenState extends State<SubFolderListScreen> {
           .ilike('subject', widget.parentFolder)
           .order('id', ascending: true);
 
-      setState(() {
-        _directLectures = List<Map<String, dynamic>>.from(response as List);
-        _isLoading = false;
-      });
+      final fetchedList = List<Map<String, dynamic>>.from(response as List);
+
+      // Save to local cache
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(cacheKey, jsonEncode(fetchedList));
+
+      if (mounted) {
+        setState(() {
+          _directLectures = fetchedList;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      debugPrint('Network fetch failed, loading from local cache: $e');
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedDataStr = prefs.getString(cacheKey);
+        if (cachedDataStr != null) {
+          final List decoded = jsonDecode(cachedDataStr);
+          if (mounted) {
+            setState(() {
+              _directLectures = List<Map<String, dynamic>>.from(decoded);
+            });
+          }
+        }
+      } catch (cacheError) {
+        debugPrint('Cache read error: $cacheError');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 

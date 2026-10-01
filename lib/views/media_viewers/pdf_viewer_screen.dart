@@ -12,7 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../ai_assistant/draggable_ai_fab.dart';
 
-// English Comment: PDF Viewer Screen supporting iframe rendering on Web with PointerInterceptor and modern Draggable AI FAB on Mobile.
+// English Comment: Robust cross-platform PDF Viewer supporting direct object embedding for web and local storage for mobile.
 class PdfViewerScreen extends StatefulWidget {
   final String title;
   final String pdfUrl;
@@ -29,7 +29,7 @@ class PdfViewerScreen extends StatefulWidget {
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   String? _localFilePath;
-  bool _isDownloading = false;
+  bool _isDownloading = true;
   double _downloadProgress = 0.0;
   String? _viewId;
 
@@ -37,34 +37,63 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   void initState() {
     super.initState();
     if (kIsWeb) {
-      _viewId = 'pdf-iframe-${DateTime.now().millisecondsSinceEpoch}';
-      // English Comment: Register iframe view factory for web PDF rendering
+      _initWebObjectPdfViewer();
+    } else {
+      _checkAndAutoDownloadPdf();
+    }
+  }
+
+  // English Comment: Uses HTML Object element for robust web PDF rendering without external Google dependency.
+  void _initWebObjectPdfViewer() {
+    try {
+      _viewId = 'pdf-object-${DateTime.now().millisecondsSinceEpoch}';
+
       // ignore: undefined_prefixed_name
       ui_web.platformViewRegistry.registerViewFactory(
         _viewId!,
-        (int id) => html.IFrameElement()
-          ..src = widget.pdfUrl
+        (int id) => html.ObjectElement()
+          ..data = widget.pdfUrl
+          ..type = 'application/pdf'
           ..style.border = 'none'
           ..style.width = '100%'
           ..style.height = '100%',
       );
-    } else {
-      _checkExistingPdf();
-    }
-  }
-
-  Future<void> _checkExistingPdf() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final fileName = widget.pdfUrl.split('/').last;
-    final file = File('${dir.path}/$fileName');
-
-    if (await file.exists()) {
+      
       setState(() {
-        _localFilePath = file.path;
+        _isDownloading = false;
+      });
+    } catch (e) {
+      debugPrint('Web object viewer init error: $e');
+      setState(() {
+        _isDownloading = false;
       });
     }
   }
 
+  // English Comment: Automatically checks local storage or triggers download immediately for mobile view.
+  Future<void> _checkAndAutoDownloadPdf() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName = widget.pdfUrl.split('/').last.split('?').first;
+      final file = File('${dir.path}/$fileName');
+
+      if (await file.exists()) {
+        setState(() {
+          _localFilePath = file.path;
+          _isDownloading = false;
+        });
+      } else {
+        await _downloadPdf();
+      }
+    } catch (e) {
+      debugPrint('Auto download check error: $e');
+      setState(() {
+        _isDownloading = false;
+      });
+    }
+  }
+
+  // English Comment: Downloads PDF file using Dio with progress tracking on mobile.
   Future<void> _downloadPdf() async {
     setState(() {
       _isDownloading = true;
@@ -73,7 +102,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final fileName = widget.pdfUrl.split('/').last;
+      final fileName = widget.pdfUrl.split('/').last.split('?').first;
       final filePath = '${dir.path}/$fileName';
 
       Dio dio = Dio();
@@ -93,12 +122,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         _localFilePath = filePath;
         _isDownloading = false;
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF downloaded successfully for offline view!')),
-        );
-      }
     } catch (e) {
       setState(() {
         _isDownloading = false;
@@ -106,6 +129,19 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Download failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadOrOpenWebPdf() async {
+    final Uri url = Uri.parse(widget.pdfUrl);
+    if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      // Successfully launched
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not process PDF action.')),
         );
       }
     }
@@ -135,16 +171,26 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   Widget build(BuildContext context) {
     if (kIsWeb) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.title)),
+        appBar: AppBar(
+          title: Text(widget.title),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.download),
+              onPressed: _downloadOrOpenWebPdf,
+              tooltip: 'Download / Open PDF',
+            ),
+          ],
+        ),
         body: Stack(
           children: [
-            _viewId == null
+            _isDownloading
                 ? const Center(child: CircularProgressIndicator())
-                : Positioned.fill(
-                    child: HtmlElementView(viewType: _viewId!),
-                  ),
+                : _viewId == null
+                    ? const Center(child: Text('Failed to load PDF view.'))
+                    : Positioned.fill(
+                        child: HtmlElementView(viewType: _viewId!),
+                      ),
             
-            // English Comment: Ensure Draggable AI Floating Button is wrapped properly with PointerInterceptor on Web
             Align(
               alignment: Alignment.bottomRight,
               child: Padding(
@@ -165,13 +211,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
-          if (_localFilePath == null)
-            IconButton(
-              icon: const Icon(Icons.download),
-              onPressed: _isDownloading ? null : _downloadPdf,
-              tooltip: 'Download PDF for Offline',
-            )
-          else
+          if (_localFilePath != null)
             const Padding(
               padding: EdgeInsets.all(12.0),
               child: Icon(Icons.check_circle, color: Colors.green),
@@ -193,11 +233,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 )
               : _localFilePath != null
                   ? PDFView(filePath: _localFilePath!)
-                  : const Center(
-                      child: Text('Click the download button top right to save and view offline.'),
+                  : Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _downloadPdf,
+                        icon: const Icon(Icons.download),
+                        label: const Text('Download and Open PDF'),
+                      ),
                     ),
           
-          // English Comment: Draggable AI Floating Button for Mobile
           DraggableAiFab(
             onPressed: () => _openAiAssistantSheet(context),
           ),

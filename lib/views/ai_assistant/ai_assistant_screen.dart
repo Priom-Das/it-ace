@@ -40,7 +40,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
-    _loadSessionsFromPrefs();
+   _createNewChatInternal();
   }
 
   @override

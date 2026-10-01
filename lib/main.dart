@@ -14,11 +14,15 @@ void main() async {
     // Handle missing .env file gracefully without crashing the app.
   }
 
-  // Initialize Supabase client with project configuration.
-  await Supabase.initialize(
-    url: 'https://vnnnhwalzqgwitlrqyxc.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZubm5od2FsenFnd2l0bHJxeXhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyMjQzMjgsImV4cCI6MjEwNTgwMDMyOH0.LU5DJHCwNEWdao7O-RPd9xCjyyyQ7aAkBvscFrk53nY',
-  );
+  // Initialize Supabase client safely to prevent crashes during offline startup.
+  try {
+    await Supabase.initialize(
+      url: 'https://vnnnhwalzqgwitlrqyxc.supabase.co',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZubm5od2FsenFnd2l0bHJxeXhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyMjQzMjgsImV4cCI6MjEwNTgwMDMyOH0.LU5DJHCwNEWdao7O-RPd9xCjyyyQ7aAkBvscFrk53nY',
+    );
+  } catch (e) {
+    debugPrint('Supabase offline initialization error: $e');
+  }
 
   runApp(const MyApp());
 }
