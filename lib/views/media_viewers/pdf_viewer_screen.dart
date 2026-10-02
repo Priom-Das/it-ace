@@ -1,7 +1,6 @@
+// File: lib/views/media_viewers/pdf_viewer_screen.dart
+
 import 'dart:io';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +10,10 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../ai_assistant/draggable_ai_fab.dart';
+
+// Conditional import to safely handle web and non-web platforms without compile errors
+import 'pdf_viewer_stub.dart' 
+    if (dart.library.html) 'pdf_viewer_web.dart';
 
 // English Comment: Robust cross-platform PDF Viewer supporting direct object embedding for web and local storage for mobile.
 class PdfViewerScreen extends StatefulWidget {
@@ -31,39 +34,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   String? _localFilePath;
   bool _isDownloading = true;
   double _downloadProgress = 0.0;
-  String? _viewId;
 
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      _initWebObjectPdfViewer();
-    } else {
+    if (!kIsWeb) {
       _checkAndAutoDownloadPdf();
-    }
-  }
-
-  // English Comment: Uses HTML Object element for robust web PDF rendering without external Google dependency.
-  void _initWebObjectPdfViewer() {
-    try {
-      _viewId = 'pdf-object-${DateTime.now().millisecondsSinceEpoch}';
-
-      // ignore: undefined_prefixed_name
-      ui_web.platformViewRegistry.registerViewFactory(
-        _viewId!,
-        (int id) => html.ObjectElement()
-          ..data = widget.pdfUrl
-          ..type = 'application/pdf'
-          ..style.border = 'none'
-          ..style.width = '100%'
-          ..style.height = '100%',
-      );
-      
-      setState(() {
-        _isDownloading = false;
-      });
-    } catch (e) {
-      debugPrint('Web object viewer init error: $e');
+    } else {
       setState(() {
         _isDownloading = false;
       });
@@ -74,7 +51,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   Future<void> _checkAndAutoDownloadPdf() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final fileName = widget.pdfUrl.split('/').last.split('?').first;
+      final rawFileName = widget.pdfUrl.split('/').last.split('?').first;
+      final fileName = Uri.decodeComponent(rawFileName);
       final file = File('${dir.path}/$fileName');
 
       if (await file.exists()) {
@@ -102,7 +80,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final fileName = widget.pdfUrl.split('/').last.split('?').first;
+      final rawFileName = widget.pdfUrl.split('/').last.split('?').first;
+      final fileName = Uri.decodeComponent(rawFileName);
       final filePath = '${dir.path}/$fileName';
 
       Dio dio = Dio();
@@ -183,14 +162,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ),
         body: Stack(
           children: [
-            _isDownloading
-                ? const Center(child: CircularProgressIndicator())
-                : _viewId == null
-                    ? const Center(child: Text('Failed to load PDF view.'))
-                    : Positioned.fill(
-                        child: HtmlElementView(viewType: _viewId!),
-                      ),
-            
+            Positioned.fill(
+              child: buildPlatformPdfView(pdfUrl: widget.pdfUrl),
+            ),
             Align(
               alignment: Alignment.bottomRight,
               child: Padding(
