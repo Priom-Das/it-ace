@@ -40,7 +40,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
-   _createNewChatInternal();
+    // Load saved chats first; a new chat is created only if none exist.
+    _loadSessionsFromPrefs();
   }
 
   @override
@@ -63,24 +64,27 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   Future<void> _loadSessionsFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? dataString = prefs.getString('ai_chat_sessions');
-    if (dataString != null) {
-      try {
+    List<ChatSession> loaded = [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? dataString = prefs.getString('ai_chat_sessions');
+      if (dataString != null) {
         final List decoded = jsonDecode(dataString);
-        setState(() {
-          _sessions = decoded.map((item) => ChatSession.fromJson(item)).toList();
-          if (_sessions.isEmpty) {
-            _createNewChatInternal();
-          } else {
-            _currentSessionIndex = 0;
-          }
-        });
-        _scrollToBottom();
-        return;
-      } catch (_) {}
-    }
-    _createNewChatInternal();
+        loaded = decoded.map((item) => ChatSession.fromJson(item)).toList();
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _sessions = loaded;
+      if (_sessions.isEmpty) {
+        _createNewChatInternal();
+      } else {
+        // Resume the most recent chat instead of wiping history.
+        _currentSessionIndex = 0;
+      }
+    });
+    _scrollToBottom();
   }
 
   Future<void> _saveSessionsToPrefs() async {
