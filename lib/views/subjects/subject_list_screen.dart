@@ -291,8 +291,12 @@ class _SubjectListScreenState extends State<SubjectListScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => LectureListScreen(
-                        subjectName: item['sub_folder'],
+                        subjectName: lectureSubjectKey(
+                          item['parent_folder'] as String,
+                          item['sub_folder'] as String,
+                        ),
                         subTopic: item['sub_folder'],
+                        parentFolder: item['parent_folder'] as String,
                       ),
                     ),
                   );

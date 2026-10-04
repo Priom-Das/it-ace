@@ -7,6 +7,7 @@ import '../media_viewers/video_player_screen.dart';
 import 'lecture_list_screen.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../ai_assistant/draggable_ai_fab.dart';
+import '../../core/constants/folder_structure.dart';
 
 // English Comment: SubFolder List Screen for navigating nested subtopics with modern Draggable AI FAB and internal PDF viewing.
 class SubFolderListScreen extends StatefulWidget {
@@ -44,7 +45,11 @@ class _SubFolderListScreenState extends State<SubFolderListScreen> {
           .ilike('subject', widget.parentFolder)
           .order('id', ascending: true);
 
-      final fetchedList = List<Map<String, dynamic>>.from(response as List);
+      var fetchedList = List<Map<String, dynamic>>.from(response as List);
+      // Files stored inside a sub folder (e.g. Bangla/Literature) are listed in that sub folder only.
+      if (hasPrefixedSubfolders(widget.parentFolder)) {
+        fetchedList = fetchedList.where((row) => lectureDirectlyInParent(row, widget.parentFolder)).toList();
+      }
 
       // Save to local cache
       final prefs = await SharedPreferences.getInstance();
@@ -147,8 +152,9 @@ class _SubFolderListScreenState extends State<SubFolderListScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => LectureListScreen(
-                                  subjectName: subFolder,
+                                  subjectName: lectureSubjectKey(widget.parentFolder, subFolder),
                                   subTopic: subFolder,
+                                  parentFolder: widget.parentFolder,
                                 ),
                               ),
                             );

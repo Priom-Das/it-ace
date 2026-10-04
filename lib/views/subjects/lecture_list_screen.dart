@@ -6,16 +6,20 @@ import '../media_viewers/pdf_viewer_screen.dart';
 import '../media_viewers/video_player_screen.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../ai_assistant/draggable_ai_fab.dart';
+import '../../core/constants/folder_structure.dart';
 
 // English Comment: Screen for displaying lecture materials with modern Draggable AI FAB and internal PDF viewing for all platforms.
 class LectureListScreen extends StatefulWidget {
   final String subjectName;
   final String? subTopic;
+  // English Comment: Set for sub folders (e.g. BANGLA > Literature) so files are placed by their storage folder.
+  final String? parentFolder;
 
   const LectureListScreen({
     super.key,
     required this.subjectName,
     this.subTopic,
+    this.parentFolder,
   });
 
   @override
@@ -56,13 +60,7 @@ class _LectureListScreenState extends State<LectureListScreen> {
 
     // English Comment: Then attempt to fetch fresh data from Supabase if online.
     try {
-      var query = _supabase
-          .from('lecture_materials')
-          .select()
-          .ilike('subject', widget.subjectName);
-
-      final response = await query.order('id', ascending: true);
-      final fetchedList = List<Map<String, dynamic>>.from(response as List);
+      final fetchedList = await _queryLectures();
 
       // Save updated list to local cache
       final prefs = await SharedPreferences.getInstance();
@@ -82,6 +80,35 @@ class _LectureListScreenState extends State<LectureListScreen> {
         });
       }
     }
+  }
+
+  // English Comment: For Bangla / English / General Knowledge sub folders a file is placed by the folder it is
+  // stored in (from its PDF link), so it shows in the right sub folder even if its "subject" only says "Bangla".
+  Future<List<Map<String, dynamic>>> _queryLectures() async {
+    final parent = widget.parentFolder;
+    final sub = widget.subTopic;
+
+    if (parent == null || sub == null || !hasPrefixedSubfolders(parent)) {
+      final response = await _supabase
+          .from('lecture_materials')
+          .select()
+          .ilike('subject', widget.subjectName)
+          .order('id', ascending: true);
+      return List<Map<String, dynamic>>.from(response as List);
+    }
+
+    final responses = await Future.wait([
+      _supabase.from('lecture_materials').select().ilike('subject', widget.subjectName),
+      _supabase.from('lecture_materials').select().ilike('subject', parent),
+    ]);
+    final Map<dynamic, Map<String, dynamic>> byId = {};
+    for (final response in responses) {
+      for (final row in List<Map<String, dynamic>>.from(response as List)) {
+        if (lectureInSubFolder(row, parent, sub)) byId[row['id']] = row;
+      }
+    }
+    return byId.values.toList()
+      ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
   }
 
   void _openAiAssistantSheet(BuildContext context) {
