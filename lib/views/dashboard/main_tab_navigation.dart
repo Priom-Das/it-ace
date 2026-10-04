@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../subjects/subject_list_screen.dart';
 import 'user_dashboard_screen.dart';
-import '../ai_assistant/ai_assistant_screen.dart'; // AI Assistant Screen import 
+import '../ai_assistant/ai_assistant_screen.dart'; // AI Assistant Screen import
 
 // English Comment: Main Navigation Bar separating Home Content, AI Assistant, and User Dashboard.
 class MainTabNavigation extends StatefulWidget {
@@ -14,10 +14,13 @@ class MainTabNavigation extends StatefulWidget {
 class _MainTabNavigationState extends State<MainTabNavigation> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    SubjectListScreen(),
-    AiAssistantScreen(), // AI Assistant Screen 
-    UserDashboardScreen(),
+  // Lets us start a fresh chat each time the AI tab is opened.
+  final GlobalKey<AiAssistantScreenState> _aiKey = GlobalKey<AiAssistantScreenState>();
+
+  late final List<Widget> _screens = [
+    const SubjectListScreen(),
+    AiAssistantScreen(key: _aiKey), // AI Assistant Screen
+    const UserDashboardScreen(),
   ];
 
   @override
@@ -30,9 +33,13 @@ class _MainTabNavigationState extends State<MainTabNavigation> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
+          final openingAssistant = index == 1 && _selectedIndex != 1;
           setState(() {
             _selectedIndex = index;
           });
+          if (openingAssistant) {
+            _aiKey.currentState?.openFreshChat();
+          }
         },
         destinations: const [
           NavigationDestination(

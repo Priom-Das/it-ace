@@ -1,6 +1,6 @@
 // IT-Ace service worker: makes the web app open offline.
 // Bump CACHE_VERSION to force every user to drop old cached files.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v3'; // v3 drops caches that may still hold the old public .env file
 const CACHE = 'it-ace-' + CACHE_VERSION;
 
 // App shell. Anything missing here is skipped, it will not break install.
@@ -16,12 +16,23 @@ const PRECACHE = [
   'main.dart.js',
   'assets/AssetManifest.bin.json',
   'assets/FontManifest.json',
+  // PDF viewer engine (skipped quietly if a file name differs in your pdfrx version).
+  'assets/packages/pdfrx/assets/pdfium.wasm',
+  'assets/packages/pdfrx/assets/pdfium_client.js',
+  'assets/packages/pdfrx/assets/pdfium_worker.js',
 ];
 
 const NETWORK_TIMEOUT_MS = 5000;
 
+// PDFs / files from Supabase Storage: kept so lectures and questions open offline after the first view.
+function isSupabaseStorage(url) {
+  return url.hostname.endsWith('.supabase.co') && url.pathname.startsWith('/storage/v1/object/');
+}
+
 function isCacheable(url) {
-  return url.origin === self.location.origin || url.hostname === 'fonts.gstatic.com';
+  return url.origin === self.location.origin ||
+         url.hostname === 'fonts.gstatic.com' ||
+         isSupabaseStorage(url);
 }
 
 self.addEventListener('install', (event) => {

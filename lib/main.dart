@@ -1,18 +1,12 @@
 // Main entry point for the IT-Ace Flutter application initializing Supabase services and Routing.
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Importing dotenv for secure environment variable management.
+import 'package:pdfrx/pdfrx.dart'; // PDF viewer used on web/PWA.
 import 'views/auth/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Load environment variables from .env file for secure API key management.
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (_) {
-    // Handle missing .env file gracefully without crashing the app.
-  }
+  pdfrxFlutterInitialize(); // Prepares the PDF engine (WASM on web).
 
   // Initialize Supabase client safely to prevent crashes during offline startup.
   try {

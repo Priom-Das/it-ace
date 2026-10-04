@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:share_plus/share_plus.dart';
 
-import 'ai_config.dart';
+import 'chat_cloud_sync.dart';
 import 'chat_session.dart';
 
 class AiAssistantScreen extends StatefulWidget {
@@ -20,10 +20,10 @@ class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key, this.isEmbedded = false});
 
   @override
-  State<AiAssistantScreen> createState() => _AiAssistantScreenState();
+  State<AiAssistantScreen> createState() => AiAssistantScreenState();
 }
 
-class _AiAssistantScreenState extends State<AiAssistantScreen> {
+class AiAssistantScreenState extends State<AiAssistantScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
@@ -32,6 +32,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   bool _isLoading = false;
   XFile? _selectedImage;
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ImagePicker _picker = ImagePicker();
   late stt.SpeechToText _speech;
   bool _isListening = false;
@@ -40,8 +41,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
-    // Load saved chats first; a new chat is created only if none exist.
-    _loadSessionsFromPrefs();
+    // Gemini style: every time the assistant opens, show a fresh empty chat,
+    // and bring the saved conversations into the history drawer.
+    _createNewChatInternal();
+    _loadSavedHistory().then((_) => _syncWithCloud());
   }
 
   @override
@@ -63,39 +66,204 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     });
   }
 
-  Future<void> _loadSessionsFromPrefs() async {
-    List<ChatSession> loaded = [];
+  static const String _prefsKey = 'ai_chat_sessions';
+  static const String _pendingDeletesKey = 'ai_chat_pending_deletes';
+
+  // Chat ids this screen changed / removed. Saving merges only these into storage, so the
+  // assistant tab and the assistant bottom sheet never overwrite each other's chats.
+  final Set<String> _dirtyIds = {}; // changed here: save locally and push to the cloud
+  final Set<String> _cachedIds = {}; // pulled from the cloud: save locally only
+  final Set<String> _deletedIds = {}; // deleted here
+  final Set<String> _removeLocalIds = {}; // deleted on another device
+  bool _clearAllRequested = false;
+  bool _syncing = false;
+
+  // Called by the bottom tab bar each time the user opens the assistant tab.
+  void openFreshChat() {
+    setState(() => _createNewChatInternal());
+    _refreshHistory();
+  }
+
+  void _touch(ChatSession s) {
+    s.updatedAt = DateTime.now().millisecondsSinceEpoch;
+    _dirtyIds.add(s.id);
+  }
+
+  // Reads chats saved on this device. Empty chats are never kept.
+  Future<List<ChatSession>> _readStoredSessions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? dataString = prefs.getString('ai_chat_sessions');
-      if (dataString != null) {
-        final List decoded = jsonDecode(dataString);
-        loaded = decoded.map((item) => ChatSession.fromJson(item)).toList();
-      }
-    } catch (_) {}
+      final String? dataString = prefs.getString(_prefsKey);
+      if (dataString == null) return [];
+      final List decoded = jsonDecode(dataString);
+      return decoded
+          .map((item) => ChatSession.fromJson(item))
+          .where((s) => s.messages.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
 
-    if (!mounted) return;
-    setState(() {
-      _sessions = loaded;
-      if (_sessions.isEmpty) {
-        _createNewChatInternal();
-      } else {
-        // Resume the most recent chat instead of wiping history.
-        _currentSessionIndex = 0;
+  // Adds chats we don't have yet and takes newer copies of ones we have, newest first.
+  // The chat that is open stays open.
+  void _mergeStored(
+    List<ChatSession> incoming, {
+    Set<String> cloudDeleted = const {},
+    bool cache = false,
+  }) {
+    final ChatSession? openChat =
+        _sessions.isNotEmpty ? _sessions[_currentSessionIndex] : null;
+
+    if (cloudDeleted.isNotEmpty) {
+      _sessions.removeWhere((s) => cloudDeleted.contains(s.id) && !_dirtyIds.contains(s.id));
+      _removeLocalIds.addAll(cloudDeleted);
+    }
+
+    final byId = {for (final s in _sessions) s.id: s};
+    for (final s in incoming) {
+      if (_deletedIds.contains(s.id) || _removeLocalIds.contains(s.id)) continue;
+      final existing = byId[s.id];
+      if (existing == null) {
+        _sessions.add(s);
+        byId[s.id] = s;
+        if (cache) _cachedIds.add(s.id);
+      } else if (s.updatedAt > existing.updatedAt && !_dirtyIds.contains(s.id)) {
+        existing.replaceWith(s);
+        if (cache) _cachedIds.add(s.id);
       }
-    });
-    _scrollToBottom();
+    }
+    _sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    if (openChat != null && _sessions.contains(openChat)) {
+      _currentSessionIndex = _sessions.indexOf(openChat);
+    } else {
+      _createNewChatInternal();
+    }
+  }
+
+  Future<void> _loadSavedHistory() async {
+    final stored = await _readStoredSessions();
+    if (!mounted) return;
+    setState(() => _mergeStored(stored));
+  }
+
+  // Called when the history drawer opens: pick up chats saved by other screens / devices.
+  Future<void> _refreshHistory() async {
+    final stored = await _readStoredSessions();
+    if (!mounted) return;
+    setState(() => _mergeStored(stored));
+    _syncWithCloud();
+  }
+
+  Future<void> _saveLocal() async {
+    try {
+      final stored = _clearAllRequested ? <ChatSession>[] : await _readStoredSessions();
+      final Map<String, ChatSession> byId = {for (final s in stored) s.id: s};
+      for (final id in _deletedIds) {
+        byId.remove(id);
+      }
+      for (final id in _removeLocalIds) {
+        byId.remove(id);
+      }
+      for (final s in _sessions) {
+        final changed = _dirtyIds.contains(s.id) || _cachedIds.contains(s.id);
+        if (changed && s.messages.isNotEmpty) {
+          byId[s.id] = s;
+        }
+      }
+      final merged = byId.values.toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKey, jsonEncode(merged.map((s) => s.toJson()).toList()));
+      _clearAllRequested = false;
+    } catch (_) {}
   }
 
   Future<void> _saveSessionsToPrefs() async {
+    await _saveLocal();
+    await _pushToCloud();
+  }
+
+  // Best effort: when offline this fails quietly and the next sync catches up.
+  Future<void> _pushToCloud() async {
+    if (ChatCloudSync.userId == null) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String encoded = jsonEncode(_sessions.map((s) => s.toJson()).toList());
-      await prefs.setString('ai_chat_sessions', encoded);
+      final dirty = _sessions
+          .where((s) => _dirtyIds.contains(s.id) && s.messages.isNotEmpty)
+          .toList();
+      if (dirty.isNotEmpty) await ChatCloudSync.upsert(dirty);
+      await _flushPendingDeletes();
     } catch (_) {}
   }
 
+  Future<void> _queueDeletes(Iterable<String> ids) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final current = prefs.getStringList(_pendingDeletesKey) ?? [];
+      await prefs.setStringList(_pendingDeletesKey, {...current, ...ids}.toList());
+    } catch (_) {}
+  }
+
+  // Throws when offline, so the delete stays queued and is retried at the next sync.
+  Future<void> _flushPendingDeletes() async {
+    if (ChatCloudSync.userId == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(_pendingDeletesKey) ?? [];
+    if (ids.isEmpty) return;
+    await ChatCloudSync.markDeleted(ids);
+    await prefs.remove(_pendingDeletesKey);
+  }
+
+  Future<void> _syncWithCloud() async {
+    if (_syncing || ChatCloudSync.userId == null) return;
+    _syncing = true;
+    try {
+      await _flushPendingDeletes();
+      final rows = await ChatCloudSync.fetchAll();
+      if (!mounted) return;
+
+      final cloudUpdated = <String, int>{};
+      final cloudDeleted = <String>{};
+      final incoming = <ChatSession>[];
+      for (final r in rows) {
+        final id = r['id'] as String;
+        cloudUpdated[id] = (r['updated_at'] as num?)?.toInt() ?? 0;
+        if (r['deleted'] == true) {
+          cloudDeleted.add(id);
+        } else {
+          final s = ChatSession.fromCloudRow(r);
+          if (s.messages.isNotEmpty) incoming.add(s);
+        }
+      }
+
+      // Chats the cloud doesn't have (made offline) or has an older copy of go up.
+      final toPush = _sessions.where((s) {
+        if (s.messages.isEmpty || cloudDeleted.contains(s.id) || _deletedIds.contains(s.id)) {
+          return false;
+        }
+        final cloudTime = cloudUpdated[s.id];
+        return cloudTime == null || s.updatedAt > cloudTime;
+      }).toList();
+      if (toPush.isNotEmpty) await ChatCloudSync.upsert(toPush);
+
+      setState(() => _mergeStored(incoming, cloudDeleted: cloudDeleted, cache: true));
+      await _saveLocal();
+    } catch (_) {
+      // Offline or not logged in: local history still works.
+    } finally {
+      _syncing = false;
+    }
+  }
+
   void _createNewChatInternal() {
+    // Already on an empty chat? Reuse it instead of piling up blank chats.
+    final emptyIndex = _sessions.indexWhere((s) => s.messages.isEmpty);
+    if (emptyIndex >= 0) {
+      _currentSessionIndex = emptyIndex;
+      _selectedImage = null;
+      return;
+    }
     final newSession = ChatSession(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: 'New Chat',
@@ -104,7 +272,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     _sessions.insert(0, newSession);
     _currentSessionIndex = 0;
     _selectedImage = null;
-    _saveSessionsToPrefs();
   }
 
   void _createNewChat() {
@@ -115,18 +282,30 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   void _deleteChat(int index) {
+    final removedId = _sessions[index].id;
     setState(() {
-      _sessions.removeAt(index);
+      final removed = _sessions.removeAt(index);
+      _deletedIds.add(removed.id);
+      _dirtyIds.remove(removed.id);
       if (_sessions.isEmpty) {
         _createNewChatInternal();
-      } else {
-        if (_currentSessionIndex >= _sessions.length) {
-          _currentSessionIndex = _sessions.length - 1;
-        }
+      } else if (index < _currentSessionIndex) {
+        _currentSessionIndex--;
+      } else if (index == _currentSessionIndex) {
+        _currentSessionIndex = 0;
+      }
+      if (_currentSessionIndex >= _sessions.length) {
+        _currentSessionIndex = _sessions.length - 1;
       }
     });
-    _saveSessionsToPrefs();
+    _queueDeletes([removedId]).then((_) => _saveSessionsToPrefs());
     _scrollToBottom();
+  }
+
+  Future<void> _clearCloudChats() async {
+    try {
+      await ChatCloudSync.markAllDeleted();
+    } catch (_) {}
   }
 
   void _clearAllChats() {
@@ -143,10 +322,17 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
+              final allIds = _sessions.map((s) => s.id).toList();
+              _deletedIds.addAll(allIds);
+              _queueDeletes(allIds);
+              _clearCloudChats();
               setState(() {
                 _sessions.clear();
+                _dirtyIds.clear();
+                _clearAllRequested = true;
                 _createNewChatInternal();
               });
+              _saveSessionsToPrefs();
               _scrollToBottom();
             },
             child: const Text('Delete All', style: TextStyle(color: Colors.red)),
@@ -247,6 +433,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   setState(() {
                     _sessions[index].title = newTitle;
                   });
+                  _touch(_sessions[index]);
                   _saveSessionsToPrefs();
                 }
                 Navigator.pop(context);
@@ -276,6 +463,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             height: height,
             width: width,
             fit: fit ?? BoxFit.cover,
+          );
+        }
+        if (snapshot.hasError) {
+          // Old chats on web: the picked image file no longer exists after a reload.
+          return Container(
+            height: height ?? 50,
+            width: width ?? 50,
+            color: Colors.grey[300],
+            child: const Center(child: Icon(Icons.broken_image_outlined, color: Colors.grey)),
           );
         }
         return Container(
@@ -374,73 +570,52 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       });
     }
 
+    _touch(currentSession);
     _saveSessionsToPrefs();
     _scrollToBottom();
 
     String? responseText;
     bool hasError = false;
-    List<Map<String, dynamic>> contentParts = [];
-
-    contentParts.add({
-      'text': 'System Directive: ${AiConfig.systemPrompt}\n\nUser Question: ${text.isEmpty ? "Please analyze this image and explain in detail." : text}'
-    });
-
+    // The image (if any) is sent to our own server function, which holds the API key.
+    String? imageBase64;
+    String imageMime = 'image/jpeg';
     if (imageToSend != null) {
       try {
         final bytes = await imageToSend.readAsBytes();
-        final base64Image = base64Encode(bytes);
-        contentParts.add({
-          'inline_data': {
-            'mime_type': 'image/jpeg',
-            'data': base64Image,
-          }
-        });
+        imageBase64 = base64Encode(bytes);
+        imageMime = imageToSend.mimeType ?? 'image/jpeg';
       } catch (e) {
         debugPrint('Image encoding error: $e');
       }
     }
 
-    for (int i = 0; i < AiConfig.apiKeys.length; i++) {
-      final apiKey = AiConfig.apiKeys[i];
-      if (apiKey.isEmpty || apiKey.startsWith('YOUR_GEMINI_API_KEY')) continue;
+    try {
+      // The Supabase Edge Function "ai-chat" calls Gemini. No API key lives in this app.
+      final response = await Supabase.instance.client.functions.invoke(
+        'ai-chat',
+        body: {
+          'text': text.isEmpty ? 'Please analyze this image and explain in detail.' : text,
+          if (imageBase64 != null) 'image': {'mime_type': imageMime, 'data': imageBase64},
+        },
+      ).timeout(const Duration(seconds: 90));
 
-      try {
-        final url = Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$apiKey',
-        );
-
-        final response = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'contents': [
-              {
-                'role': 'user',
-                'parts': contentParts,
-              }
-            ],
-            'generationConfig': {
-              'maxOutputTokens': 8192,
-              'temperature': 0.7,
-            }
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          responseText = data['candidates']?[0]?['content']?['parts']?[0]?['text'];
-          if (responseText != null && responseText.isNotEmpty) {
-            hasError = false;
-            break;
-          }
-        } else {
-          debugPrint('API Error Status: ${response.statusCode}, Body: ${response.body}');
-          hasError = true;
-        }
-      } catch (e) {
-        debugPrint('HTTP Exception: $e');
+      final data = response.data;
+      if (data is Map && data['text'] is String && (data['text'] as String).isNotEmpty) {
+        responseText = data['text'] as String;
+      } else {
         hasError = true;
       }
+    } on FunctionException catch (e) {
+      debugPrint('AI function error: status ${e.status}');
+      hasError = true;
+      if (e.status == 429) {
+        responseText = 'Too many requests. Please wait a minute and try again.';
+      } else if (e.status == 401) {
+        responseText = 'Please log in again to use the AI assistant.';
+      }
+    } catch (e) {
+      debugPrint('AI request failed: $e');
+      hasError = true;
     }
 
     if (responseText == null || responseText.isEmpty) {
@@ -458,6 +633,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       });
       _isLoading = false;
     });
+    _touch(currentSession);
     _saveSessionsToPrefs();
     _scrollToBottom();
   }
@@ -467,7 +643,19 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final currentSession = _sessions.isNotEmpty ? _sessions[_currentSessionIndex] : null;
 
     final Widget mainContent = Scaffold(
+      key: _scaffoldKey,
+      onDrawerChanged: (isOpen) {
+        if (isOpen) _refreshHistory();
+      },
+      drawerEnableOpenDragGesture: !widget.isEmbedded,
       appBar: AppBar(
+        leading: widget.isEmbedded
+            ? IconButton(
+                icon: const Icon(Icons.history),
+                tooltip: 'Chat History',
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              )
+            : null,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -495,7 +683,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
         ],
       ),
-      drawer: widget.isEmbedded ? null : Drawer(
+      drawer: Drawer(
         child: Column(
           children: [
             DrawerHeader(
