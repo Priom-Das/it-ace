@@ -1,5 +1,7 @@
 // English Comment: Main assistant screen featuring robust text cleaning for LaTeX wrapper tags and proper markdown rendering.
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,6 +33,12 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
   int _currentSessionIndex = 0;
   bool _isLoading = false;
   XFile? _selectedImage;
+  // A PDF or text file attached to the next message: {name, mime, bytes}. Kept in memory only.
+  Map<String, dynamic>? _attachedFile;
+  static const List<String> _fileExtensions = [
+    'pdf', 'txt', 'md', 'csv', 'json', 'html', 'xml', 'c', 'cpp', 'h', 'java', 'py', 'js', 'dart', 'sql',
+  ];
+  static const int _maxFileBytes = 8 * 1024 * 1024; // 8 MB
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ImagePicker _picker = ImagePicker();
@@ -262,6 +270,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
     if (emptyIndex >= 0) {
       _currentSessionIndex = emptyIndex;
       _selectedImage = null;
+      _attachedFile = null;
       return;
     }
     final newSession = ChatSession(
@@ -272,6 +281,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
     _sessions.insert(0, newSession);
     _currentSessionIndex = 0;
     _selectedImage = null;
+    _attachedFile = null;
   }
 
   void _createNewChat() {
@@ -374,9 +384,48 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
       if (pickedFile != null) {
         setState(() {
           _selectedImage = pickedFile;
+          _attachedFile = null;
         });
       }
     } catch (_) {}
+  }
+
+  void _showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  // English Comment: Attach a PDF or text/code file. The AI reads its content together with your question.
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _fileExtensions,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final Uint8List? bytes = file.bytes;
+      if (bytes == null) {
+        _showMessage('Could not read this file.');
+        return;
+      }
+      if (bytes.length > _maxFileBytes) {
+        _showMessage('This file is too large. The limit is 8 MB.');
+        return;
+      }
+      setState(() {
+        _attachedFile = {
+          'name': file.name,
+          'mime': (file.extension ?? '').toLowerCase() == 'pdf' ? 'application/pdf' : 'text/plain',
+          'bytes': bytes,
+        };
+        _selectedImage = null;
+      });
+    } catch (e) {
+      debugPrint('File pick failed: $e');
+      _showMessage('Could not attach this file.');
+    }
   }
 
   void _showImageSourceDialog() {
@@ -400,6 +449,15 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('Attach a file (PDF or text)'),
+                subtitle: const Text('PDF, TXT, MD, CSV, code files. Max 8 MB'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickFile();
                 },
               ),
             ],
@@ -537,11 +595,12 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
-  Future<void> _sendMessage({String? customQuery, XFile? customImage}) async {
+  Future<void> _sendMessage({String? customQuery, XFile? customImage, Map<String, dynamic>? customFile}) async {
     final text = customQuery ?? _messageController.text.trim();
     final XFile? imageToSend = customImage ?? _selectedImage;
+    final Map<String, dynamic>? fileToSend = customFile ?? _attachedFile;
 
-    if ((text.isEmpty && imageToSend == null) || _sessions.isEmpty) return;
+    if ((text.isEmpty && imageToSend == null && fileToSend == null) || _sessions.isEmpty) return;
 
     final currentSession = _sessions[_currentSessionIndex];
 
@@ -551,17 +610,19 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
           'sender': 'user',
           'text': text,
           'image': imageToSend,
+          'fileName': fileToSend?['name'],
           'isError': false,
         });
 
         if (currentSession.title == 'New Chat') {
           currentSession.title = text.isNotEmpty
               ? (text.length > 25 ? '${text.substring(0, 25)}...' : text)
-              : 'Image Query';
+              : (fileToSend != null ? 'File Query' : 'Image Query');
         }
 
         _isLoading = true;
         _selectedImage = null;
+        _attachedFile = null;
       });
       _messageController.clear();
     } else {
@@ -589,13 +650,27 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
       }
     }
 
+    Map<String, dynamic>? filePayload;
+    if (fileToSend != null) {
+      filePayload = {
+        'name': fileToSend['name'],
+        'mime_type': fileToSend['mime'],
+        'data': base64Encode(fileToSend['bytes'] as Uint8List),
+      };
+    }
+
     try {
       // The Supabase Edge Function "ai-chat" calls Gemini. No API key lives in this app.
       final response = await Supabase.instance.client.functions.invoke(
         'ai-chat',
         body: {
-          'text': text.isEmpty ? 'Please analyze this image and explain in detail.' : text,
+          'text': text.isEmpty
+              ? (filePayload != null
+                  ? 'Please read this file and explain what it contains.'
+                  : 'Please analyze this image and explain in detail.')
+              : text,
           if (imageBase64 != null) 'image': {'mime_type': imageMime, 'data': imageBase64},
+          if (filePayload != null) 'file': filePayload,
         },
       ).timeout(const Duration(seconds: 90));
 
@@ -630,6 +705,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
         'isError': hasError,
         'originalQuery': text,
         'originalImage': imageToSend,
+        'originalFile': fileToSend,
       });
       _isLoading = false;
     });
@@ -808,6 +884,24 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
                                     child: _buildSafeImage(msgImage, height: 200, fit: BoxFit.cover),
                                   ),
                                 ),
+                              if (message['fileName'] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8.0),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.insert_drive_file_outlined, size: 18),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          message['fileName'].toString(),
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               if (messageText.isNotEmpty)
                                 isUser
                                     ? SelectableText(
@@ -844,10 +938,11 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
                                                   onPressed: () {
                                                     final String prevQuery = message['originalQuery'] ?? '';
                                                     final XFile? prevImage = message['originalImage'];
+                                                    final Map<String, dynamic>? prevFile = message['originalFile'];
                                                     setState(() {
                                                       currentSession.messages.removeAt(index);
                                                     });
-                                                    _sendMessage(customQuery: prevQuery, customImage: prevImage);
+                                                    _sendMessage(customQuery: prevQuery, customImage: prevImage, customFile: prevFile);
                                                   },
                                                   icon: const Icon(Icons.refresh, size: 16, color: Colors.red),
                                                   label: const Text('Retry', style: TextStyle(color: Colors.red)),
@@ -919,6 +1014,31 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
                 ],
               ),
             ),
+          if (_attachedFile != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Row(
+                children: [
+                  const Icon(Icons.insert_drive_file_outlined),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _attachedFile!['name'].toString(),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      setState(() {
+                        _attachedFile = null;
+                      });
+                    },
+                  )
+                ],
+              ),
+            ),
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -934,8 +1054,8 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.image_outlined),
-                  tooltip: 'Attach Image',
+                  icon: const Icon(Icons.attach_file),
+                  tooltip: 'Attach image or file',
                   onPressed: _showImageSourceDialog,
                 ),
                 IconButton(

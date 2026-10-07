@@ -6,7 +6,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 // English Comment: Dedicated Upload Screen for previous year questions with fixed storage path and schema matching.
 class PreviousQuestionUploadScreen extends StatefulWidget {
-  const PreviousQuestionUploadScreen({super.key});
+  // The folder to pre-select, for example when uploading from inside the IT folder.
+  final String? initialCategory;
+
+  const PreviousQuestionUploadScreen({super.key, this.initialCategory});
 
   @override
   State<PreviousQuestionUploadScreen> createState() => _PreviousQuestionUploadScreenState();
@@ -19,7 +22,8 @@ class _PreviousQuestionUploadScreenState extends State<PreviousQuestionUploadScr
   final _examYearController = TextEditingController();
   final _jobCategoryController = TextEditingController();
 
-  String _selectedSubCategory = 'General';
+  late String _selectedSubCategory =
+      widget.initialCategory == 'IT' ? 'IT' : 'General';
   FilePickerResult? _pickedFile;
   bool _isUploading = false;
 

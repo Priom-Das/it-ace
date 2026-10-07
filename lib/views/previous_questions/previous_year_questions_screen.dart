@@ -2,12 +2,56 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../media_viewers/pdf_viewer_screen.dart';
+import 'previous_question_list_screen.dart';
 import 'previous_question_upload_screen.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../ai_assistant/draggable_ai_fab.dart';
 
-// English Comment: Screen dedicated ONLY for Previous Year Questions with modern Draggable AI FAB and fixed Upload Button and offline caching.
+// English Comment: Loads previous year questions (cache first, then server) and tells which folder a row belongs to.
+class PreviousQuestionsRepo {
+  static const String cacheKey = 'cached_previous_questions';
+  static const List<String> folders = ['General', 'IT'];
+
+  static Future<List<Map<String, dynamic>>> loadCached() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString(cacheKey);
+      if (cached == null) return [];
+      return List<Map<String, dynamic>>.from(jsonDecode(cached) as List);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // Throws when offline, so the caller can keep showing the cached list.
+  static Future<List<Map<String, dynamic>>> fetch() async {
+    final response = await Supabase.instance.client
+        .from('previous_questions')
+        .select()
+        .order('id', ascending: false);
+    final list = List<Map<String, dynamic>>.from(response as List);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(cacheKey, jsonEncode(list));
+    } catch (_) {}
+    return list;
+  }
+
+  // The "category" column decides the folder. Older rows without a category are sorted by their title / job
+  // category, so nothing is lost: IT-looking papers go to IT, the rest to General.
+  static String folderOf(Map<String, dynamic> row) {
+    final category = (row['category'] ?? '').toString().trim().toLowerCase();
+    if (category == 'it') return 'IT';
+    if (category == 'general') return 'General';
+    final hint = '${row['title'] ?? ''} ${row['job_category'] ?? ''} ${row['exam_name'] ?? ''}'.toLowerCase();
+    final looksIt = RegExp(
+      r'\b(it|ict)\b|programmer|software|network|engineer|database|developer|system analyst|computer',
+    ).hasMatch(hint);
+    return looksIt ? 'IT' : 'General';
+  }
+}
+
+// English Comment: Previous Year Questions is split into two folders, General and IT.
 class PreviousYearQuestionsScreen extends StatefulWidget {
   const PreviousYearQuestionsScreen({super.key});
 
@@ -16,73 +60,42 @@ class PreviousYearQuestionsScreen extends StatefulWidget {
 }
 
 class _PreviousYearQuestionsScreenState extends State<PreviousYearQuestionsScreen> {
-  final SupabaseClient _supabase = Supabase.instance.client;
-  bool _isLoading = true;
   List<Map<String, dynamic>> _questions = [];
-  static const String _cacheKey = 'cached_previous_questions';
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadQuestions();
+    _load();
   }
 
-  Future<void> _loadQuestions() async {
-    // English Comment: Load cached data first for instant offline availability
-    await _loadFromCache();
-    // English Comment: Then try fetching fresh data from server
-    await _fetchPreviousQuestions();
-  }
-
-  Future<void> _loadFromCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? cachedData = prefs.getString(_cacheKey);
-      if (cachedData != null) {
-        final List<dynamic> decodedList = jsonDecode(cachedData);
-        setState(() {
-          _questions = List<Map<String, dynamic>>.from(decodedList);
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      // Ignore cache read errors
-    }
-  }
-
-  Future<void> _saveToCache(List<Map<String, dynamic>> data) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cacheKey, jsonEncode(data));
-    } catch (e) {
-      // Ignore cache write errors
-    }
-  }
-
-  Future<void> _fetchPreviousQuestions() async {
-    try {
-      final response = await _supabase
-          .from('previous_questions')
-          .select()
-          .order('id', ascending: false);
-
-      final fetchedList = List<Map<String, dynamic>>.from(response as List);
-      
+  Future<void> _load() async {
+    final cached = await PreviousQuestionsRepo.loadCached();
+    if (mounted && cached.isNotEmpty) {
       setState(() {
-        _questions = fetchedList;
+        _questions = cached;
         _isLoading = false;
       });
-
-      // English Comment: Save latest fetched data to local cache
-      await _saveToCache(fetchedList);
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (_questions.isEmpty && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Offline mode: Unable to sync latest questions. ($e)')),
-        );
-      }
     }
+    try {
+      final fresh = await PreviousQuestionsRepo.fetch();
+      if (!mounted) return;
+      setState(() {
+        _questions = fresh;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false); // offline: keep the cached numbers
+    }
+  }
+
+  int _count(String folder) => _questions.where((q) => PreviousQuestionsRepo.folderOf(q) == folder).length;
+
+  void _openFolder(String folder) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PreviousQuestionListScreen(folder: folder)),
+    ).then((_) => _load());
   }
 
   void _openAiAssistantSheet(BuildContext context) {
@@ -113,14 +126,13 @@ class _PreviousYearQuestionsScreenState extends State<PreviousYearQuestionsScree
         backgroundColor: const Color(0xFFDCD2F9),
         elevation: 0,
       ),
-      // Upload Question button fixed at bottom-right
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'upload_question_fab_prev_q',
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const PreviousQuestionUploadScreen()),
-          ).then((_) => _fetchPreviousQuestions());
+          ).then((_) => _load());
         },
         icon: const Icon(Icons.upload_file),
         label: const Text('Upload Question'),
@@ -131,55 +143,33 @@ class _PreviousYearQuestionsScreenState extends State<PreviousYearQuestionsScree
         children: [
           _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _questions.isEmpty
-                  ? const Center(child: Text('No previous year questions uploaded yet.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _questions.length,
-                      itemBuilder: (context, index) {
-                        final q = _questions[index];
-                        final String? pdfUrl = q['file_url'];
-
-                        return Card(
-                          elevation: 0,
-                          color: const Color(0xFFF3EEFC),
-                          margin: const EdgeInsets.symmetric(vertical: 6),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: ListTile(
-                            title: Text(
-                              q['title'] ?? 'Untitled Question',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+              : ListView(
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    for (final folder in PreviousQuestionsRepo.folders)
+                      Card(
+                        elevation: 0,
+                        color: const Color(0xFFF3EEFC),
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6B4EE6),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            subtitle: Text('Category: ${q['category']} | Year: ${q['exam_year'] ?? 'N/A'}'),
-                            trailing: OutlinedButton.icon(
-                              onPressed: () {
-                                if (pdfUrl != null && pdfUrl.isNotEmpty) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => PdfViewerScreen(
-                                        title: q['title'] ?? 'Question Paper',
-                                        pdfUrl: pdfUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.picture_as_pdf, size: 18, color: Colors.grey),
-                              label: const Text('PDF', style: TextStyle(color: Colors.grey)),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Colors.grey),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                              ),
-                            ),
+                            child: const Icon(Icons.folder_outlined, color: Colors.white),
                           ),
-                        );
-                      },
-                    ),
+                          title: Text(folder, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('${_count(folder)} question paper${_count(folder) == 1 ? '' : 's'}'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _openFolder(folder),
+                        ),
+                      ),
+                  ],
+                ),
 
           // Messenger Chat Head Style Draggable AI Floating Button
           DraggableAiFab(

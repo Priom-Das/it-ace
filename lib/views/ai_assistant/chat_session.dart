@@ -33,6 +33,7 @@ class ChatSession {
             'sender': m['sender'],
             'text': m['text'],
             'imagePath': m['image'] != null ? (m['image'] as XFile).path : null,
+            'fileName': m['fileName'],
             'isError': m['isError'] ?? false,
           };
         }).toList(),
@@ -46,6 +47,7 @@ class ChatSession {
           'sender': msg['sender'],
           'text': msg['text'],
           'image': msg['imagePath'] != null ? XFile(msg['imagePath']) : null,
+          'fileName': msg['fileName'],
           'isError': msg['isError'] ?? false,
         });
       }
@@ -68,6 +70,7 @@ class ChatSession {
             .map((m) => {
                   'sender': m['sender'],
                   'text': m['text'],
+                  'fileName': m['fileName'],
                   'isError': m['isError'] ?? false,
                 })
             .toList(),
@@ -84,6 +87,7 @@ class ChatSession {
           'sender': msg['sender'],
           'text': msg['text'],
           'image': null,
+          'fileName': msg['fileName'],
           'isError': msg['isError'] ?? false,
         });
       }
