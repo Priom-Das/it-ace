@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'general_practice_card.dart';
+import 'daily_study_plan_card.dart';
 
 // English Comment: User Dashboard displaying user information and stats.
 class UserDashboardScreen extends StatefulWidget {
@@ -69,59 +71,57 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : ListView(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Card(
-                    color: const Color(0xFFF3EEFC),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Color(0xFF6B4EE6),
-                        child: Icon(Icons.person, color: Colors.white),
-                      ),
-                      title: Text(
-                        _userProfile?['full_name'] ?? user?.email ?? 'User',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(user?.email ?? ''),
+              children: [
+                Card(
+                  color: const Color(0xFFF3EEFC),
+                  child: ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFF6B4EE6),
+                      child: Icon(Icons.person, color: Colors.white),
                     ),
+                    title: Text(
+                      _userProfile?['full_name'] ?? user?.email ?? 'User',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(user?.email ?? ''),
                   ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Recent Exam Performance',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: _examHistory.isEmpty
-                        ? const Center(child: Text('No exam records found.'))
-                        : ListView.builder(
-                            itemCount: _examHistory.length,
-                            itemBuilder: (context, index) {
-                              final attempt = _examHistory[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                child: ListTile(
-                                  title: Text(attempt['subject_name'] ?? 'Subject Exam'),
-                                  subtitle: Text(
-                                    'Correct: ${attempt['correct_answers']} / ${attempt['total_questions']}',
-                                  ),
-                                  trailing: Text(
-                                    'Score: ${attempt['score']}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF6B4EE6),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
+                ),
+                const SizedBox(height: 16),
+                const DailyStudyPlanCard(),
+                const SizedBox(height: 16),
+                const GeneralPracticeCard(),
+                const SizedBox(height: 20),
+                const Text(
+                  'Recent Exam Performance',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                if (_examHistory.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: Text('No exam records found.')),
+                  )
+                else
+                  for (final attempt in _examHistory)
+                    Card(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      child: ListTile(
+                        title: Text(attempt['subject_name'] ?? 'Subject Exam'),
+                        subtitle: Text(
+                          'Correct: ${attempt['correct_answers']} / ${attempt['total_questions']}',
+                        ),
+                        trailing: Text(
+                          'Score: ${attempt['score']}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF6B4EE6),
                           ),
-                  ),
-                ],
-              ),
+                        ),
+                      ),
+                    ),
+              ],
             ),
     );
   }
