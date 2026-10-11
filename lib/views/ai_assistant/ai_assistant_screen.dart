@@ -714,6 +714,62 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
     _scrollToBottom();
   }
 
+  // Blank chat: shows the latest saved chats so old history can be opened from here too,
+  // in the AI tab and in the floating-button sheet alike. "See all" opens the full history drawer.
+  Widget _buildEmptyState() {
+    final recent = <int>[
+      for (int i = 0; i < _sessions.length; i++)
+        if (_sessions[i].messages.isNotEmpty) i,
+    ].take(6).toList();
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const SizedBox(height: 24),
+        const Center(
+          child: Text(
+            'Ask anything... Your AI assistant is ready to help!',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
+        if (recent.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              const Icon(Icons.history, size: 18, color: Colors.grey),
+              const SizedBox(width: 6),
+              const Text(
+                'Recent chats',
+                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                child: const Text('See all'),
+              ),
+            ],
+          ),
+          for (final i in recent)
+            Card(
+              elevation: 0,
+              color: const Color(0xFFF3EEFC),
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: ListTile(
+                leading: const Icon(Icons.chat_bubble_outline),
+                title: Text(_sessions[i].title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                onTap: () {
+                  setState(() => _currentSessionIndex = i);
+                  _scrollToBottom();
+                },
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentSession = _sessions.isNotEmpty ? _sessions[_currentSessionIndex] : null;
@@ -723,15 +779,15 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
       onDrawerChanged: (isOpen) {
         if (isOpen) _refreshHistory();
       },
-      drawerEnableOpenDragGesture: !widget.isEmbedded,
+      // Same behaviour in the AI tab and in the floating-button sheet: swipe from the left edge
+      // or tap the menu button to open the chat history.
+      drawerEnableOpenDragGesture: true,
       appBar: AppBar(
-        leading: widget.isEmbedded
-            ? IconButton(
-                icon: const Icon(Icons.history),
-                tooltip: 'Chat History',
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-              )
-            : null,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          tooltip: 'Chat History',
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -750,7 +806,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
           ],
         ),
         centerTitle: true,
-        automaticallyImplyLeading: !widget.isEmbedded,
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -787,7 +843,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
               leading: const Icon(Icons.add),
               title: const Text('Start New Chat'),
               onTap: () {
-                Navigator.pop(context);
+                _scaffoldKey.currentState?.closeDrawer();
                 _createNewChat();
               },
             ),
@@ -823,7 +879,9 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
                       setState(() {
                         _currentSessionIndex = index;
                       });
-                      Navigator.pop(context);
+                      // closeDrawer() only closes the drawer. Navigator.pop() could close the whole
+                      // floating-button sheet instead and throw the chosen chat away.
+                      _scaffoldKey.currentState?.closeDrawer();
                       _scrollToBottom();
                     },
                   );
@@ -837,16 +895,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
         children: [
           Expanded(
             child: (currentSession == null || currentSession.messages.isEmpty)
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Text(
-                        'Ask anything... Your AI assistant is ready to help!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  )
+                ? _buildEmptyState()
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
