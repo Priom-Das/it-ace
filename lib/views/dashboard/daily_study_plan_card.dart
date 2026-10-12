@@ -19,6 +19,7 @@ class DailyStudyPlanCard extends StatefulWidget {
 
 class _DailyStudyPlanCardState extends State<DailyStudyPlanCard> {
   static const Color _purple = Color(0xFF6B4EE6);
+  static const int _visibleLinks = 2;
 
   late final DateTime _today;
   StudyState? _s;
@@ -191,15 +192,17 @@ class _DailyStudyPlanCardState extends State<DailyStudyPlanCard> {
   Widget _topicTile(String topic, StudyState s) {
     final done = _todayDone.contains(topic);
     final resources = resourcesForTopic(topic);
-    // Every other exam link is always visible. SATT Academy is always the LAST option and stays hidden
-    // until "+N more" is tapped.
+    // SATT Academy chips are kept out of the compact view: they only appear
+    // after tapping "+N more".
     bool isSatt(String k) => k == 'sattacademy' || k == 'satt_bb_ict';
     final ordered = [
       ...resources.where((k) => !isSatt(k)),
       ...resources.where(isSatt),
     ];
     final open = _expanded.contains(topic);
-    final primary = ordered.where((k) => !isSatt(k)).toList();
+    var primary = ordered.where((k) => !isSatt(k)).take(_visibleLinks).toList();
+    // General topics (Bangla, English, Math...) only have SATT, so show it there.
+    if (primary.isEmpty) primary = ordered.take(_visibleLinks).toList();
     final shown = open ? ordered : primary;
     final hidden = ordered.length - shown.length;
 

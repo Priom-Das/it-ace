@@ -20,6 +20,7 @@ const List<_Link> _bbSubjects = [
   _Link('English', '$_bb/english/mcq', Icons.translate),
   _Link('Bangla', '$_bb/বাংলা/mcq', Icons.menu_book_outlined),
   _Link('GK', '$_bb/সাধারণ-জ্ঞান/mcq', Icons.public),
+  _Link('Mental Ability', '$_bb/মানসিক-দক্ষতা/mcq', Icons.psychology_outlined),
 ];
 
 const List<_Link> _otherBanks = [

@@ -154,7 +154,7 @@ const Map<String, Map<String, String>> topicDeepLinks = {
   'Mathematics': {'sattacademy': 'https://sattacademy.com/all-mcq/গণিত'},
   'General Knowledge': {'sattacademy': 'https://sattacademy.com/all-mcq/সাধারণ-জ্ঞান'},
   'Current Affairs': {'sattacademy': 'https://sattacademy.com/gk'},
-  'Mental Ability': {'sattacademy': 'https://sattacademy.com/question-bank'},
+  'Mental Ability': {'sattacademy': 'https://sattacademy.com/all-mcq/মানসিক-দক্ষতা'},
   'Internet of Things (IoT)': {
     'examveda': 'https://www.examveda.com/computer-science/practice-mcq-question-on-internet-of-things-(iot)/',
     'tutorialspoint': 'https://www.tutorialspoint.com/internet_of_things/index.htm',
@@ -183,12 +183,12 @@ const Map<String, String> _sanfoundryPages = {
 
 class ResolvedLink {
   final String url;
-  final bool isSearch; // true = a Google search limited to the site, used when there is no verified direct page
+  final bool isSearch; // always false now: only direct pages are linked
   const ResolvedLink(this.url, this.isSearch);
 }
 
-// English Comment: The page for (topic, site). A verified direct page is used when we have one. Otherwise the link is a
-// Google search limited to that site, so every site listed for a topic still shows and lands on that topic.
+// English Comment: The direct page for (topic, site), or null when there is no verified page. Nothing falls back to
+// a search any more: a topic simply shows only the links that open a real page.
 // Revision days have no single topic, so they open the site's home page.
 ResolvedLink? linkFor(String topic, String sourceKey) {
   final res = studyResources[sourceKey];
@@ -211,12 +211,7 @@ ResolvedLink? linkFor(String topic, String sourceKey) {
   if (topic == 'Weekly Revision' || topic == 'Previous Year Questions') {
     return ResolvedLink(siteUrl, false);
   }
-
-  // No verified page: search the site for the topic (the card shows these chips with a search icon).
-  final host = Uri.parse(siteUrl).host.replaceFirst('www.', '');
-  final suffix = res.note.contains('MCQ') ? ' MCQ' : '';
-  final query = Uri.encodeQueryComponent('site:$host $topic$suffix');
-  return ResolvedLink('https://www.google.com/search?q=$query', true);
+  return null;
 }
 
 const Set<String> _nonItTopics = {
@@ -230,14 +225,12 @@ const Set<String> _nonItTopics = {
   'Previous Year Questions',
 };
 
-// English Comment: Resources shown for a topic: its list in topicResources plus every site that has a verified direct
-// page for it (topicDeepLinks), so no checked page is left out. IT topics also get the Bangladesh Bank ICT MCQ page
-// (the card always shows SATT last), topics the user typed in themselves get SATT's job question bank.
+// English Comment: Resources shown for a topic. IT topics get the Bangladesh Bank ICT MCQ page first (real practice),
+// topics the user typed in themselves get SATT's job question bank.
 List<String> resourcesForTopic(String topic) {
   final base = topicResources[topic];
   if (base == null) return const ['sattacademy'];
-  final merged = <String>{...base, ...(topicDeepLinks[topic]?.keys ?? const <String>[])}.toList();
-  final withPractice = _nonItTopics.contains(topic) ? merged : ['satt_bb_ict', ...merged];
+  final withPractice = _nonItTopics.contains(topic) ? base : ['satt_bb_ict', ...base];
   return [
     for (final key in withPractice)
       if (studyResources[key] != null && (studyResources[key]!.url == null || linkFor(topic, key) != null)) key,

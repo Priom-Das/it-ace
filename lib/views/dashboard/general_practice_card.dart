@@ -22,6 +22,7 @@ const List<_Page> _subjects = [
   _Page('English', 'https://sattacademy.com/all-mcq/english', Icons.translate),
   _Page('Math', 'https://sattacademy.com/all-mcq/গণিত', Icons.calculate_outlined),
   _Page('GK', 'https://sattacademy.com/all-mcq/সাধারণ-জ্ঞান', Icons.public),
+  _Page('Mental Ability', 'https://sattacademy.com/all-mcq/মানসিক-দক্ষতা', Icons.psychology_outlined),
   _Page('Current Affairs', 'https://sattacademy.com/gk', Icons.newspaper),
 ];
 
