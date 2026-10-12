@@ -22,6 +22,12 @@ const Map<String, StudyResource> studyResources = {
   'guru99': StudyResource('Guru99', 'https://www.guru99.com/', 'Concept tutorials'),
   'geeksforgeeks': StudyResource('GeeksforGeeks', 'https://www.geeksforgeeks.org/', 'Concepts + problems'),
   'gateoverflow': StudyResource('GATE Overflow', 'https://gateoverflow.in/', 'Previous questions'),
+  'sattacademy': StudyResource('SATT Academy', 'https://sattacademy.com/', 'Practice MCQs'),
+  'satt_bb_ict': StudyResource(
+    'SATT · BB ICT MCQs',
+    'https://sattacademy.com/question-bank/বাংলাদেশ-ব্যাংক/তথ্য-ও-যোগাযোগ-প্রযুক্তি/mcq',
+    'Bangladesh Bank ICT MCQs',
+  ),
   'book_ds': StudyResource('Data Structure – Dr. Rafiqul Islam', null, 'Book'),
   'book_digital': StudyResource('Digital Logic and Computer Design – Morris Mano', null, 'Book'),
 };
@@ -32,23 +38,30 @@ const Map<String, List<String>> topicResources = {
   'Data Structure & Algorithm': ['sanfoundry', 'geeksforgeeks', 'gateoverflow', 'tutorialspoint', 'book_ds'],
   'Discrete Mathematics': ['geeksforgeeks', 'gateoverflow', 'tutorialspoint'],
   'Database Management System': ['sanfoundry', 'examveda', 'guru99', 'tutorialspoint', 'gateoverflow'],
-  'Object Oriented Programming': ['javatpoint', 'beginnersbook', 'guru99', 'geeksforgeeks'],
-  'Software Engineering': ['tutorialspoint', 'geeksforgeeks', 'javatpoint', 'examveda'],
+  'Object Oriented Programming': ['sanfoundry', 'javatpoint', 'beginnersbook', 'guru99', 'geeksforgeeks'],
+  'Software Engineering': ['sanfoundry', 'tutorialspoint', 'geeksforgeeks', 'javatpoint', 'examveda'],
   'Computer Networking': ['sanfoundry', 'tutorialspoint', 'geeksforgeeks', 'indiabix'],
   'Data Communication': ['sanfoundry', 'tutorialspoint', 'examveda'],
-  'Cyber Security': ['tutorialspoint', 'geeksforgeeks', 'medium'],
+  'Cyber Security': ['sanfoundry', 'tutorialspoint', 'geeksforgeeks', 'medium'],
   'Operating System': ['sanfoundry', 'geeksforgeeks', 'gateoverflow', 'guru99'],
   'Computer Architecture & Microprocessor': ['sanfoundry', 'gateoverflow', 'geeksforgeeks'],
-  'Compiler Design': ['geeksforgeeks', 'tutorialspoint', 'gateoverflow'],
+  'Compiler Design': ['sanfoundry', 'geeksforgeeks', 'tutorialspoint', 'gateoverflow'],
   'Digital Electronics': ['sanfoundry', 'tutorialspoint', 'book_digital'],
   'Circuit Analysis': ['sanfoundry', 'tutorialspoint'],
-  'Computer Fundamentals': ['indiabix', 'examveda', 'examradar', 'sanfoundry'],
-  'Artificial Intelligence': ['geeksforgeeks', 'tutorialspoint', 'medium'],
-  'Internet of Things (IoT)': ['tutorialspoint', 'geeksforgeeks', 'medium'],
+  'Computer Fundamentals': ['sanfoundry', 'indiabix', 'examveda', 'examradar'],
+  'Artificial Intelligence': ['sanfoundry', 'geeksforgeeks', 'tutorialspoint', 'medium'],
+  'Internet of Things (IoT)': ['sanfoundry', 'tutorialspoint', 'geeksforgeeks', 'medium'],
   'Data Center': ['geeksforgeeks', 'medium', 'tutorialspoint'],
   'ICT in Banking Sector': ['examveda', 'examradar', 'indiabix'],
-  'Weekly Revision': ['examveda', 'indiabix', 'sanfoundry'],
-  'Previous Year Questions': ['examradar', 'examveda', 'gateoverflow'],
+  'Weekly Revision': ['sattacademy', 'examveda', 'indiabix', 'sanfoundry'],
+  'Previous Year Questions': ['sattacademy', 'examradar', 'examveda', 'gateoverflow'],
+  // General topics (SATT Academy pages, checked on the live site)
+  'Bangla': ['sattacademy'],
+  'English': ['sattacademy'],
+  'Mathematics': ['sattacademy'],
+  'General Knowledge': ['sattacademy'],
+  'Current Affairs': ['sattacademy'],
+  'Mental Ability': ['sattacademy'],
 };
 
 // English Comment: DateTime.weekday numbers (Mon=1 ... Sun=7) -> topics of that day.
@@ -136,35 +149,143 @@ const Map<String, Map<String, String>> topicDeepLinks = {
     'geeksforgeeks': 'https://www.geeksforgeeks.org/artificial-intelligence/',
     'tutorialspoint': 'https://www.tutorialspoint.com/artificial_intelligence/index.htm',
   },
+  'Bangla': {'sattacademy': 'https://sattacademy.com/all-mcq/বাংলা'},
+  'English': {'sattacademy': 'https://sattacademy.com/all-mcq/english'},
+  'Mathematics': {'sattacademy': 'https://sattacademy.com/all-mcq/গণিত'},
+  'General Knowledge': {'sattacademy': 'https://sattacademy.com/all-mcq/সাধারণ-জ্ঞান'},
+  'Current Affairs': {'sattacademy': 'https://sattacademy.com/gk'},
+  'Mental Ability': {'sattacademy': 'https://sattacademy.com/question-bank'},
   'Internet of Things (IoT)': {
     'examveda': 'https://www.examveda.com/computer-science/practice-mcq-question-on-internet-of-things-(iot)/',
     'tutorialspoint': 'https://www.tutorialspoint.com/internet_of_things/index.htm',
   },
 };
 
-// Sites where a search should ask for MCQs.
-const Set<String> _mcqSites = {'examveda', 'examradar', 'indiabix', 'sanfoundry'};
+// English Comment: Sanfoundry MCQ index page of each topic (found on the live site).
+const Map<String, String> _sanfoundryPages = {
+  'C Programming': 'https://www.sanfoundry.com/c-interview-questions-answers/',
+  'Data Structure & Algorithm': 'https://www.sanfoundry.com/1000-data-structure-questions-answers/',
+  'Database Management System': 'https://www.sanfoundry.com/1000-database-management-system-questions-answers/',
+  'Computer Networking': 'https://www.sanfoundry.com/computer-network-questions-answers/',
+  'Data Communication': 'https://www.sanfoundry.com/1000-digital-communications-questions-answers/',
+  'Operating System': 'https://www.sanfoundry.com/operating-system-questions-answers/',
+  'Computer Architecture & Microprocessor': 'https://www.sanfoundry.com/1000-computer-organization-architecture-questions-answers/',
+  'Digital Electronics': 'https://www.sanfoundry.com/1000-digital-circuits-questions-answers/',
+  'Circuit Analysis': 'https://www.sanfoundry.com/1000-basic-electrical-engineering-questions-answers/',
+  'Computer Fundamentals': 'https://www.sanfoundry.com/1000-computer-fundamentals-questions-answers/',
+  'Software Engineering': 'https://www.sanfoundry.com/software-engineering-questions-answers/',
+  'Compiler Design': 'https://www.sanfoundry.com/1000-compilers-questions-answers/',
+  'Cyber Security': 'https://www.sanfoundry.com/1000-cyber-security-questions-answers/',
+  'Artificial Intelligence': 'https://www.sanfoundry.com/artificial-intelligence-questions-answers/',
+  'Internet of Things (IoT)': 'https://www.sanfoundry.com/1000-iot-questions-answers/',
+  'Object Oriented Programming': 'https://www.sanfoundry.com/1000-object-oriented-programming-oops-questions-answers/',
+};
 
 class ResolvedLink {
   final String url;
-  final bool isSearch; // true = Google search limited to the site, not a direct page
+  final bool isSearch; // true = a Google search limited to the site, used when there is no verified direct page
   const ResolvedLink(this.url, this.isSearch);
 }
 
-// English Comment: The best link for (topic, site): a direct page when known, else a site-limited search for the topic.
+// English Comment: The page for (topic, site). A verified direct page is used when we have one. Otherwise the link is a
+// Google search limited to that site, so every site listed for a topic still shows and lands on that topic.
 // Revision days have no single topic, so they open the site's home page.
 ResolvedLink? linkFor(String topic, String sourceKey) {
   final res = studyResources[sourceKey];
   final siteUrl = res?.url;
   if (res == null || siteUrl == null) return null;
 
+  if (sourceKey == 'satt_bb_ict') return ResolvedLink(siteUrl, false);
+
+  if (sourceKey == 'sanfoundry') {
+    final page = _sanfoundryPages[topic];
+    if (page != null) return ResolvedLink(page, false);
+  }
+
   final direct = topicDeepLinks[topic]?[sourceKey];
   if (direct != null) return ResolvedLink(direct, false);
+
+  // SATT has no page for this topic: open its job question bank.
+  if (sourceKey == 'sattacademy') return const ResolvedLink('https://sattacademy.com/question-bank', false);
 
   if (topic == 'Weekly Revision' || topic == 'Previous Year Questions') {
     return ResolvedLink(siteUrl, false);
   }
+
+  // No verified page: search the site for the topic (the card shows these chips with a search icon).
   final host = Uri.parse(siteUrl).host.replaceFirst('www.', '');
-  final query = 'site:$host $topic${_mcqSites.contains(sourceKey) ? ' MCQ' : ''}';
-  return ResolvedLink('https://www.google.com/search?q=${Uri.encodeQueryComponent(query)}', true);
+  final suffix = res.note.contains('MCQ') ? ' MCQ' : '';
+  final query = Uri.encodeQueryComponent('site:$host $topic$suffix');
+  return ResolvedLink('https://www.google.com/search?q=$query', true);
 }
+
+const Set<String> _nonItTopics = {
+  'Bangla',
+  'English',
+  'Mathematics',
+  'General Knowledge',
+  'Current Affairs',
+  'Mental Ability',
+  'Weekly Revision',
+  'Previous Year Questions',
+};
+
+// English Comment: Resources shown for a topic: its list in topicResources plus every site that has a verified direct
+// page for it (topicDeepLinks), so no checked page is left out. IT topics also get the Bangladesh Bank ICT MCQ page
+// (the card always shows SATT last), topics the user typed in themselves get SATT's job question bank.
+List<String> resourcesForTopic(String topic) {
+  final base = topicResources[topic];
+  if (base == null) return const ['sattacademy'];
+  final merged = <String>{...base, ...(topicDeepLinks[topic]?.keys ?? const <String>[])}.toList();
+  final withPractice = _nonItTopics.contains(topic) ? merged : ['satt_bb_ict', ...merged];
+  return [
+    for (final key in withPractice)
+      if (studyResources[key] != null && (studyResources[key]!.url == null || linkFor(topic, key) != null)) key,
+  ];
+}
+
+// English Comment: Ready-made weekly plans for different target exams. Each day is Saturday..Friday by DateTime.weekday.
+class StudyPreset {
+  final String id;
+  final String name;
+  final String description;
+  final Map<int, List<String>> days;
+  const StudyPreset(this.id, this.name, this.description, this.days);
+}
+
+const String defaultPresetId = 'it_full';
+const String customPresetId = 'custom';
+
+const List<StudyPreset> studyPresets = [
+  StudyPreset('it_full', 'IT Officer · all IT subjects', 'Covers all 19 IT subjects through the week.', weeklyPlan),
+  StudyPreset('bank_it', 'Bank IT Officer · IT + General', 'Core IT subjects mixed with Bangla, English, Math and GK.', {
+    6: ['C Programming', 'Data Structure & Algorithm', 'Mathematics'],
+    7: ['Database Management System', 'Object Oriented Programming', 'English'],
+    1: ['Computer Networking', 'Data Communication', 'Bangla'],
+    2: ['Operating System', 'Computer Architecture & Microprocessor', 'General Knowledge'],
+    3: ['Software Engineering', 'Cyber Security', 'Mental Ability'],
+    4: ['Digital Electronics', 'Computer Fundamentals', 'Current Affairs', 'ICT in Banking Sector'],
+    5: ['Weekly Revision', 'Previous Year Questions'],
+  }),
+  StudyPreset('ntrca_ict', 'NTRCA · ICT Lecturer', 'General (Bangla, English, Math, GK) twice a week plus ICT subjects.', {
+    6: ['Bangla', 'English', 'Digital Electronics'],
+    7: ['Mathematics', 'General Knowledge', 'C Programming'],
+    1: ['Bangla', 'English', 'Database Management System'],
+    2: ['Mathematics', 'General Knowledge', 'Computer Networking'],
+    3: ['Current Affairs', 'Data Communication', 'Computer Fundamentals'],
+    4: ['English', 'Mathematics', 'Object Oriented Programming'],
+    5: ['Weekly Revision', 'Previous Year Questions'],
+  }),
+  StudyPreset('general_job', 'General Job · Bangla, English, Math, GK', 'For exams with only general subjects.', {
+    6: ['Bangla', 'Mathematics'],
+    7: ['English', 'General Knowledge'],
+    1: ['Mathematics', 'Mental Ability'],
+    2: ['Bangla', 'Current Affairs'],
+    3: ['English', 'General Knowledge'],
+    4: ['Computer Fundamentals', 'Mental Ability', 'Current Affairs'],
+    5: ['Weekly Revision', 'Previous Year Questions'],
+  }),
+];
+
+StudyPreset presetById(String id) =>
+    studyPresets.firstWhere((p) => p.id == id, orElse: () => studyPresets.first);

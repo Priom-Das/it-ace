@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'general_practice_card.dart';
+import 'bank_practice_card.dart';
 import 'daily_study_plan_card.dart';
 
 // English Comment: User Dashboard displaying user information and stats.
@@ -90,6 +91,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 ),
                 const SizedBox(height: 16),
                 const DailyStudyPlanCard(),
+                const SizedBox(height: 16),
+                const BankPracticeCard(),
                 const SizedBox(height: 16),
                 const GeneralPracticeCard(),
                 const SizedBox(height: 20),

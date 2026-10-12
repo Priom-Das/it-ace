@@ -1,6 +1,6 @@
 // IT-Ace service worker: makes the web app open offline.
 // Bump CACHE_VERSION to force every user to drop old cached files.
-const CACHE_VERSION = 'v3'; // v3 drops caches that may still hold the old public .env file
+const CACHE_VERSION = 'v9'; // v9 drops caches that may still hold the old public .env file
 const CACHE = 'it-ace-' + CACHE_VERSION;
 
 // App shell. Anything missing here is skipped, it will not break install.
