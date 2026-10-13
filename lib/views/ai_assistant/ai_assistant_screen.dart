@@ -1,12 +1,11 @@
 // English Comment: Main assistant screen featuring robust text cleaning for LaTeX wrapper tags and proper markdown rendering.
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,7 +28,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
-  List<ChatSession> _sessions = [];
+  final List<ChatSession> _sessions = [];
   int _currentSessionIndex = 0;
   bool _isLoading = false;
   XFile? _selectedImage;
@@ -576,7 +575,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
             ),
           ));
         } catch (_) {
-          widgets.add(Text('\$${latexCode}\$', style: const TextStyle(fontSize: 15)));
+          widgets.add(Text('\$$latexCode\$', style: const TextStyle(fontSize: 15)));
         }
       }
       lastMatchEnd = match.end;
@@ -1094,7 +1093,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
               color: Theme.of(context).colorScheme.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 5,
                   offset: const Offset(0, -2),
                 )

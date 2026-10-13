@@ -1,7 +1,6 @@
 // File: lib/views/media_viewers/pdf_viewer_screen.dart
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

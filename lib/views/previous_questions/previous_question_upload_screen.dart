@@ -121,7 +121,7 @@ class _PreviousQuestionUploadScreenState extends State<PreviousQuestionUploadScr
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedSubCategory,
+              initialValue: _selectedSubCategory,
               decoration: const InputDecoration(
                 labelText: 'Folder / Sub-Category',
                 border: OutlineInputBorder(),

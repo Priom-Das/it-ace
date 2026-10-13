@@ -195,10 +195,21 @@ class _DailyStudyPlanCardState extends State<DailyStudyPlanCard> {
     // SATT Academy chips are kept out of the compact view: they only appear
     // after tapping "+N more".
     bool isSatt(String k) => k == 'sattacademy' || k == 'satt_bb_ict';
-    final ordered = [
-      ...resources.where((k) => !isSatt(k)),
-      ...resources.where(isSatt),
-    ];
+    // MCQ-practice sites first (most useful for exam prep), tutorials next, SATT last.
+    const mcqFirst = ['sanfoundry', 'indiabix', 'examveda', 'examradar'];
+    int rank(String k) {
+      if (isSatt(k)) return 100;
+      final i = mcqFirst.indexOf(k);
+      final base = i >= 0 ? i : 10;
+      // Links with a real topic page come before ones that only open a site's home page.
+      return hasTopicPage(topic, k) ? base : base + 20;
+    }
+    // Dart's sort is not stable, so the original index breaks ties.
+    final ordered = [...resources]
+      ..sort((a, b) {
+        final r = rank(a).compareTo(rank(b));
+        return r != 0 ? r : resources.indexOf(a).compareTo(resources.indexOf(b));
+      });
     final open = _expanded.contains(topic);
     var primary = ordered.where((k) => !isSatt(k)).take(_visibleLinks).toList();
     // General topics (Bangla, English, Math...) only have SATT, so show it there.

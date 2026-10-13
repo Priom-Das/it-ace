@@ -89,7 +89,7 @@ const Map<int, String> weekdayNames = {
 };
 
 // English Comment: Direct pages for a topic on a site (checked against the live sites). Where a topic has no
-// entry here, linkFor() falls back to a Google search limited to that site, so the link still lands on the topic.
+// entry here, linkFor() opens the site's home page (never a search).
 const Map<String, Map<String, String>> topicDeepLinks = {
   'C Programming': {
     'indiabix': 'https://www.indiabix.com/c-programming/questions-and-answers/',
@@ -208,10 +208,15 @@ ResolvedLink? linkFor(String topic, String sourceKey) {
   // SATT has no page for this topic: open its job question bank.
   if (sourceKey == 'sattacademy') return const ResolvedLink('https://sattacademy.com/question-bank', false);
 
-  if (topic == 'Weekly Revision' || topic == 'Previous Year Questions') {
-    return ResolvedLink(siteUrl, false);
-  }
-  return null;
+  // No verified topic page: open the site's home page (never a search), so the link is still there under "more".
+  return ResolvedLink(siteUrl, false);
+}
+
+// True when the link opens a real page for this topic, false when it only opens the site's home page.
+bool hasTopicPage(String topic, String sourceKey) {
+  if (sourceKey == 'satt_bb_ict') return true;
+  if (sourceKey == 'sanfoundry' && _sanfoundryPages[topic] != null) return true;
+  return topicDeepLinks[topic]?[sourceKey] != null;
 }
 
 const Set<String> _nonItTopics = {
@@ -233,7 +238,7 @@ List<String> resourcesForTopic(String topic) {
   final withPractice = _nonItTopics.contains(topic) ? base : ['satt_bb_ict', ...base];
   return [
     for (final key in withPractice)
-      if (studyResources[key] != null && (studyResources[key]!.url == null || linkFor(topic, key) != null)) key,
+      if (studyResources[key] != null) key,
   ];
 }
 
