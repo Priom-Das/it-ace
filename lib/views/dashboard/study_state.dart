@@ -62,7 +62,7 @@ class StudyState {
       rawPlan.forEach((k, v) {
         final day = int.tryParse('$k');
         if (day != null && day >= 1 && day <= 7 && v is List) {
-          plan[day] = v.map((e) => '$e').toList();
+          plan[day] = v.map((e) => canonicalTopic('$e')).toSet().toList();
         }
       });
     }
@@ -75,7 +75,7 @@ class StudyState {
     if (rawMinutes is Map) {
       rawMinutes.forEach((k, v) {
         final m = (v as num?)?.toInt();
-        if (m != null && m > 0) minutes['$k'] = m;
+        if (m != null && m > 0) minutes[canonicalTopic('$k')] = m;
       });
     }
 
@@ -85,7 +85,7 @@ class StudyState {
       rawDone.forEach((k, v) {
         if (v is Map && v['t'] is List) {
           done['$k'] = DoneDay(
-            (v['t'] as List).map((e) => '$e').toSet(),
+            (v['t'] as List).map((e) => canonicalTopic('$e')).toSet(),
             (v['at'] as num?)?.toInt() ?? 0,
           );
         }

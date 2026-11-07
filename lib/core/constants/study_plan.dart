@@ -1,5 +1,13 @@
 // English Comment: Study resources (websites + books) and the weekly topic-wise study plan used by the dashboard.
 
+// English Comment: Topics that were renamed. Old names in saved plans (on the device or in the cloud) are
+// converted to the new name when they are loaded, so nothing is lost and the links keep working.
+const Map<String, String> topicAliases = {
+  'Circuit Analysis': 'Basic Electrical Engineering',
+};
+
+String canonicalTopic(String topic) => topicAliases[topic] ?? topic;
+
 class StudyResource {
   final String name;
   final String? url; // null = a book (shown, but nothing to open)
@@ -47,7 +55,7 @@ const Map<String, List<String>> topicResources = {
   'Computer Architecture & Microprocessor': ['sanfoundry', 'gateoverflow', 'geeksforgeeks'],
   'Compiler Design': ['sanfoundry', 'geeksforgeeks', 'tutorialspoint', 'gateoverflow'],
   'Digital Electronics': ['sanfoundry', 'tutorialspoint', 'book_digital'],
-  'Circuit Analysis': ['sanfoundry', 'tutorialspoint'],
+  'Basic Electrical Engineering': ['sanfoundry', 'tutorialspoint'],
   'Computer Fundamentals': ['sanfoundry', 'indiabix', 'examveda', 'examradar'],
   'Artificial Intelligence': ['sanfoundry', 'geeksforgeeks', 'tutorialspoint', 'medium'],
   'Internet of Things (IoT)': ['sanfoundry', 'tutorialspoint', 'geeksforgeeks', 'medium'],
@@ -71,7 +79,7 @@ const Map<int, List<String>> weeklyPlan = {
   7: ['Database Management System', 'Object Oriented Programming', 'Software Engineering'], // Sunday
   1: ['Computer Networking', 'Data Communication', 'Cyber Security'], // Monday
   2: ['Operating System', 'Computer Architecture & Microprocessor', 'Compiler Design'], // Tuesday
-  3: ['Digital Electronics', 'Circuit Analysis', 'Computer Fundamentals'], // Wednesday
+  3: ['Digital Electronics', 'Basic Electrical Engineering', 'Computer Fundamentals'], // Wednesday
   4: ['Artificial Intelligence', 'Internet of Things (IoT)', 'Data Center', 'ICT in Banking Sector'], // Thursday
   5: ['Weekly Revision', 'Previous Year Questions'], // Friday
 };
@@ -137,7 +145,7 @@ const Map<String, Map<String, String>> topicDeepLinks = {
     'indiabix': 'https://www.indiabix.com/digital-electronics/questions-and-answers/',
     'geeksforgeeks': 'https://www.geeksforgeeks.org/digital-electronics-logic-design-tutorials/',
   },
-  'Circuit Analysis': {
+  'Basic Electrical Engineering': {
     'indiabix': 'https://www.indiabix.com/electronics/questions-and-answers/',
   },
   'Computer Fundamentals': {
@@ -171,7 +179,7 @@ const Map<String, String> _sanfoundryPages = {
   'Operating System': 'https://www.sanfoundry.com/operating-system-questions-answers/',
   'Computer Architecture & Microprocessor': 'https://www.sanfoundry.com/1000-computer-organization-architecture-questions-answers/',
   'Digital Electronics': 'https://www.sanfoundry.com/1000-digital-circuits-questions-answers/',
-  'Circuit Analysis': 'https://www.sanfoundry.com/1000-basic-electrical-engineering-questions-answers/',
+  'Basic Electrical Engineering': 'https://www.sanfoundry.com/1000-basic-electrical-engineering-questions-answers/',
   'Computer Fundamentals': 'https://www.sanfoundry.com/1000-computer-fundamentals-questions-answers/',
   'Software Engineering': 'https://www.sanfoundry.com/software-engineering-questions-answers/',
   'Compiler Design': 'https://www.sanfoundry.com/1000-compilers-questions-answers/',

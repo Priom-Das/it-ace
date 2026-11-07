@@ -19,7 +19,7 @@ final Map<String, List<String>> folderStructure = {
     'Compiler Design',
     'Internet of Things (IoT)',
     'Data Center',
-    'Circuit Analysis',
+    'Basic Electrical Engineering',
     'ICT in Banking Sector',
   ],
   'BANGLA': ['Literature', 'Grammar'],
